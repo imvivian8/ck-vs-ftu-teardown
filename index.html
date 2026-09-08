@@ -266,6 +266,24 @@
     position:absolute; top:22px; right:28px; background:none; border:none; color:#f2efe6;
     font-size:28px; cursor:pointer; line-height:1;
   }
+  .lightbox-nav{
+    position:absolute; top:50%; transform:translateY(-50%); background:rgba(242,239,230,.12);
+    border:1px solid rgba(242,239,230,.3); color:#f2efe6; width:44px; height:44px; border-radius:50%;
+    font-size:20px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+    transition:background .12s ease;
+  }
+  .lightbox-nav:hover{background:rgba(242,239,230,.24);}
+  .lightbox-nav:disabled{opacity:.25; cursor:default;}
+  .lightbox-nav:disabled:hover{background:rgba(242,239,230,.12);}
+  .lightbox-nav-prev{left:calc(2vw - 4px);}
+  .lightbox-nav-next{right:calc(2vw - 4px);}
+  @media (max-width:760px){
+    .lightbox-nav-prev{left:4px;} .lightbox-nav-next{right:4px;}
+    .lightbox-nav{width:38px; height:38px; font-size:17px;}
+  }
+  .lightbox-counter{
+    font-family:var(--font-mono); font-size:11px; color:#b9b3a2; letter-spacing:.03em;
+  }
 
   .backlink{font-family:var(--font-mono); font-size:11px; color:var(--neutral);}
 
@@ -310,9 +328,12 @@
 
 <div class="lightbox" id="lightbox">
   <button class="lightbox-close" id="lightboxClose" aria-label="Close">&times;</button>
+  <button class="lightbox-nav lightbox-nav-prev" id="lightboxPrev" aria-label="Previous screenshot">&#8249;</button>
+  <button class="lightbox-nav lightbox-nav-next" id="lightboxNext" aria-label="Next screenshot">&#8250;</button>
   <div class="lightbox-inner">
     <img id="lightboxImg" src="" alt="">
     <div class="lightbox-cap" id="lightboxCap"></div>
+    <div class="lightbox-counter" id="lightboxCounter"></div>
   </div>
 </div>
 
@@ -368,31 +389,61 @@ function prodBadge(p){
   return '<span class="badge badge-both">Both</span>';
 }
 
-function openLightboxSrc(src, title, cap){
-  document.getElementById('lightboxImg').src = src;
-  document.getElementById('lightboxImg').alt = title;
-  document.getElementById('lightboxCap').innerHTML = `<b>${esc(title)}</b><br>${esc(cap||'')}`;
+/* ======================= LIGHTBOX WITH GALLERY NAVIGATION =======================
+   Every clickable thumbnail belongs to a named, ordered "gallery" (e.g. the evidence
+   gallery for one product, or the full appendix for one product). GALLERIES holds
+   each gallery's ordered item list; lbState tracks which gallery + index is currently
+   open so prev/next can step through it without closing the modal. */
+const GALLERIES = {};
+function registerGallery(name, items){ GALLERIES[name] = items; }
+const lbState = { gallery: null, index: -1 };
+
+function renderLightboxAt(gallery, index){
+  const items = GALLERIES[gallery];
+  if(!items || !items.length) return;
+  const i = ((index % items.length) + items.length) % items.length; // wrap
+  const item = items[i];
+  lbState.gallery = gallery; lbState.index = i;
+  document.getElementById('lightboxImg').src = item.src;
+  document.getElementById('lightboxImg').alt = item.title;
+  document.getElementById('lightboxCap').innerHTML = `<b>${esc(item.title)}</b><br>${esc(item.cap||'')}`;
+  document.getElementById('lightboxCounter').textContent = `${i+1} / ${items.length}`;
+  const onlyOne = items.length <= 1;
+  document.getElementById('lightboxPrev').disabled = onlyOne;
+  document.getElementById('lightboxNext').disabled = onlyOne;
   document.getElementById('lightbox').classList.add('open');
 }
-function openLightbox(key, title, cap){ openLightboxSrc(img(key), title, cap); }
+function lightboxStep(delta){
+  if(lbState.gallery==null) return;
+  renderLightboxAt(lbState.gallery, lbState.index + delta);
+}
 function closeLightbox(){ document.getElementById('lightbox').classList.remove('open'); }
 document.getElementById('lightboxClose').addEventListener('click', closeLightbox);
+document.getElementById('lightboxPrev').addEventListener('click', ()=>lightboxStep(-1));
+document.getElementById('lightboxNext').addEventListener('click', ()=>lightboxStep(1));
 document.getElementById('lightbox').addEventListener('click', e=>{ if(e.target.id==='lightbox') closeLightbox(); });
-document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeLightbox(); });
-
-/* Delegated click handlers: any element with data-lightbox-key (base64 lookup) or
-   data-lightbox-path (direct file path, used by the appendix) opens the lightbox.
-   Avoids inline onclick="" string-building, which breaks when captions contain quotes. */
-document.addEventListener('click', (e)=>{
-  const k = e.target.closest('[data-lightbox-key]');
-  if(k){ openLightbox(k.dataset.lightboxKey, k.dataset.lightboxTitle||'', k.dataset.lightboxCap||''); return; }
-  const p = e.target.closest('[data-lightbox-path]');
-  if(p){ openLightboxSrc(p.dataset.lightboxPath, p.dataset.lightboxTitle||'', p.dataset.lightboxCap||''); return; }
+document.addEventListener('keydown', e=>{
+  if(!document.getElementById('lightbox').classList.contains('open')) return;
+  if(e.key==='Escape') closeLightbox();
+  else if(e.key==='ArrowLeft') lightboxStep(-1);
+  else if(e.key==='ArrowRight') lightboxStep(1);
 });
 
-function shotImgTag(key, title, cap, extraClass){
+/* Delegated click handler: any element with data-gallery + data-idx opens the
+   lightbox at that position within its gallery. Avoids inline onclick="" string-
+   building, which breaks when captions contain quotes. */
+document.addEventListener('click', (e)=>{
+  const t = e.target.closest('[data-gallery]');
+  if(!t) return;
+  renderLightboxAt(t.dataset.gallery, parseInt(t.dataset.idx, 10));
+});
+
+/* Inline single shots referenced directly in prose (e.g. the monetization paywall
+   pair) are pre-registered as their own small named gallery — see PAYWALL_PAIR below
+   — so this just emits a thumbnail tagged with that gallery name + its index in it. */
+function shotImgTag(key, title, cap, extraClass, galleryName, galleryIdx){
   return `<img class="${extraClass||'journey-shot'}" src="${img(key)}" alt="${esc(title)}"
-    data-lightbox-key="${esc(key)}" data-lightbox-title="${esc(title)}" data-lightbox-cap="${esc(cap)}">`;
+    data-gallery="${esc(galleryName)}" data-idx="${galleryIdx}">`;
 }
 
 /* ======================= PERSONA STRIP ======================= */
@@ -466,12 +517,15 @@ function buildProductTab(panelId, product){
   });
   html += `</div></div>`;
 
-  // Screenshot gallery for this product
+  // Screenshot gallery for this product — registered as a named, ordered gallery
+  // so the lightbox's prev/next arrows can step through it in place.
+  const evidenceGalleryName = 'evidence-' + product;
+  registerGallery(evidenceGalleryName, shots.map(s=>({src: img(s.key), title: s.title, cap: s.cap})));
   html += `<div class="section"><div class="section-head"><h2>Evidence gallery</h2></div>
-  <div class="section-desc">Click any screen to enlarge. Selected from the full ${m.total_screens}-screen log as the moments that matter most.</div>
+  <div class="section-desc">Click any screen to enlarge, then use the arrows (or &larr;/&rarr;) to step through. Selected from the full ${m.total_screens}-screen log as the moments that matter most.</div>
   <div class="shot-grid" style="margin-top:16px;">`;
-  shots.forEach(s=>{
-    html += `<div class="shot-card" data-lightbox-key="${esc(s.key)}" data-lightbox-title="${esc(s.title)}" data-lightbox-cap="${esc(s.cap)}">
+  shots.forEach((s,i)=>{
+    html += `<div class="shot-card" data-gallery="${evidenceGalleryName}" data-idx="${i}">
       <img src="${img(s.key)}" alt="${esc(s.title)}">
       <div class="cap"><b>${esc(s.title)}</b>${esc(s.cap)}</div>
     </div>`;
@@ -511,13 +565,25 @@ function buildProductTab(panelId, product){
     html += `</div></div>`;
   }
 
-  // Appendix: every screenshot from the full traversal, grouped by phase
+  // Appendix: every screenshot from the full traversal, grouped by phase for display,
+  // but registered as ONE continuous gallery so arrows step through the whole
+  // traversal in order, crossing phase boundaries seamlessly.
   const manifest = APPENDIX[product];
   const phaseNums = Object.keys(manifest).map(Number).sort((a,b)=>a-b);
   const totalCount = phaseNums.reduce((sum,p)=>sum+manifest[p].length, 0);
+  const appendixGalleryName = 'appendix-' + product;
+  const appendixItems = [];
+  phaseNums.forEach(p=>{
+    manifest[p].forEach(s=>{
+      appendixItems.push({src: `assets/full/${product}/${s.file}`, title: `Phase ${p} · ${s.code} — ${s.title}`, cap: s.file});
+    });
+  });
+  registerGallery(appendixGalleryName, appendixItems);
+
   html += `<div class="section appendix-section" id="appendix-${product}">
     <div class="section-head"><h2>Appendix: full screen log</h2></div>
-    <div class="section-desc">Every screenshot captured across the ${isCk?'CK Tax':'FreeTaxUSA'} traversal (${totalCount} images), grouped by phase, for direct reference. Click any thumbnail to enlarge.</div>`;
+    <div class="section-desc">Every screenshot captured across the ${isCk?'CK Tax':'FreeTaxUSA'} traversal (${totalCount} images), grouped by phase below — click any thumbnail to enlarge, then use the arrows (or &larr;/&rarr;) to step through the entire traversal in order.</div>`;
+  let runningIdx = 0;
   phaseNums.forEach(p=>{
     const shots = manifest[p];
     html += `<div class="appendix-phase">
@@ -525,10 +591,11 @@ function buildProductTab(panelId, product){
       <div class="appendix-grid">`;
     shots.forEach(s=>{
       const path = `assets/full/${product}/${s.file}`;
-      html += `<div class="appendix-thumb" data-lightbox-path="${esc(path)}" data-lightbox-title="${esc(s.code+' — '+s.title)}" data-lightbox-cap="${esc(s.file)}">
+      html += `<div class="appendix-thumb" data-gallery="${appendixGalleryName}" data-idx="${runningIdx}">
         <img src="${path}" alt="${esc(s.title)}" loading="lazy">
         <div class="appendix-cap">${esc(s.code)}</div>
       </div>`;
+      runningIdx++;
     });
     html += `</div></div>`;
   });
@@ -651,6 +718,10 @@ function buildAnalysisTab(){
 
   // MONETIZATION section
   const mo = DATA.monetization_comparison;
+  registerGallery('paywall-comparison', [
+    {src: img('ftu-08-paywall-1599'), title:'FTU Order Products', cap:'Federal FREE + CA $15.99 = $15.99, with Remove control on-screen.'},
+    {src: img('ck-12-paywall'), title:'CK Tax paywall', cap:'Federal $0 + CA $15 = $15, live card form + PLUS $29 bundle on the same screen.'}
+  ]);
   html += `<div class="section">
     <div class="section-head"><h2>Monetization &amp; value extraction</h2></div>
     <div class="section-desc">How each product turns a free federal return into revenue, without tanking S2C completion.</div>
@@ -700,11 +771,11 @@ function buildAnalysisTab(){
       <h3 style="font-size:15px; margin-bottom:10px;">Paywall, side by side</h3>
       <div class="grid-2">
         <div class="card">
-          ${shotImgTag('ftu-08-paywall-1599','FTU Order Products','Federal FREE + CA $15.99 = $15.99, with Remove control on-screen.','journey-shot')}
+          ${shotImgTag('ftu-08-paywall-1599','FTU Order Products','Federal FREE + CA $15.99 = $15.99, with Remove control on-screen.','journey-shot','paywall-comparison',0)}
           <div class="journey-caption">FreeTaxUSA &middot; <span class="journey-price">$15.99</span> total, cart-removal directly accessible.</div>
         </div>
         <div class="card">
-          ${shotImgTag('ck-12-paywall','CK Tax paywall','Federal $0 + CA $15 = $15, live card form + PLUS $29 bundle on the same screen.','journey-shot')}
+          ${shotImgTag('ck-12-paywall','CK Tax paywall','Federal $0 + CA $15 = $15, live card form + PLUS $29 bundle on the same screen.','journey-shot','paywall-comparison',1)}
           <div class="journey-caption">CK Tax &middot; <span class="journey-price">$15.00</span> total, payment form and PLUS upsell on the same screen.</div>
         </div>
       </div>
