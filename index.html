@@ -1,0 +1,798 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S2C Teardown: CK Tax vs FreeTaxUSA</title>
+<style>
+  html,body{margin:0;}
+  :root{
+    --ink:#12181f; --ink-soft:#3b4753; --paper:#f7f5ef; --paper-raised:#ffffff;
+    --line:#dfd9c9; --line-soft:#eae5d6;
+    --ck:#2f6f5e; --ck-soft:#e4efe9; --ck-ink:#1d463b;
+    --ftu:#b6511f; --ftu-soft:#f6e9df; --ftu-ink:#7a3512;
+    --neutral:#8a8578; --neutral-soft:#eeece3;
+    --risk:#a53225; --risk-soft:#f6e2dd;
+    --warn:#a1791f; --warn-soft:#f5ecd8;
+    --good:#3c6e4a; --good-soft:#e3ede4;
+    --shadow: 0 1px 2px rgba(18,24,31,.06), 0 6px 20px -8px rgba(18,24,31,.18);
+    --radius: 10px;
+    --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
+    --font-body: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ink:#eee9dd; --ink-soft:#b9b3a2; --paper:#15191d; --paper-raised:#1c2126;
+      --line:#33393f; --line-soft:#282e33;
+      --ck:#5fae95; --ck-soft:#1c2b25; --ck-ink:#a7d8c5;
+      --ftu:#e08a54; --ftu-soft:#2c2119; --ftu-ink:#f0b287;
+      --neutral:#9a9486; --neutral-soft:#23282c;
+      --risk:#e08375; --risk-soft:#2e1f1c;
+      --warn:#d9b25c; --warn-soft:#2c2618;
+      --good:#7fbd8f; --good-soft:#1c2820;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -10px rgba(0,0,0,.5);
+    }
+  }
+  :root[data-theme="dark"]{
+    --ink:#eee9dd; --ink-soft:#b9b3a2; --paper:#15191d; --paper-raised:#1c2126;
+    --line:#33393f; --line-soft:#282e33;
+    --ck:#5fae95; --ck-soft:#1c2b25; --ck-ink:#a7d8c5;
+    --ftu:#e08a54; --ftu-soft:#2c2119; --ftu-ink:#f0b287;
+    --neutral:#9a9486; --neutral-soft:#23282c;
+    --risk:#e08375; --risk-soft:#2e1f1c;
+    --warn:#d9b25c; --warn-soft:#2c2618;
+    --good:#7fbd8f; --good-soft:#1c2820;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -10px rgba(0,0,0,.5);
+  }
+
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:var(--font-body); font-size:15px; line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,h4{font-family:var(--font-display); text-wrap:balance; margin:0; color:var(--ink);}
+  h1{font-weight:600;} h2{font-weight:600;} h3{font-weight:600;}
+  a{color:inherit;}
+  .mono{font-family:var(--font-mono); font-variant-numeric:tabular-nums;}
+  .eyebrow{
+    font-family:var(--font-mono); font-size:11px; letter-spacing:.09em; text-transform:uppercase;
+    color:var(--neutral); font-weight:500;
+  }
+
+  /* ---- Top chrome ---- */
+  .topbar{
+    position:sticky; top:0; z-index:40; background:var(--paper);
+    border-bottom:1px solid var(--line); backdrop-filter: blur(6px);
+  }
+  .topbar-inner{
+    max-width:1180px; margin:0 auto; padding:14px 24px 0;
+  }
+  .masthead{
+    display:flex; align-items:baseline; justify-content:space-between; gap:16px;
+    flex-wrap:wrap; padding-bottom:12px;
+  }
+  .masthead-title{font-size:22px; letter-spacing:-.01em;}
+  .masthead-sub{font-size:12.5px; color:var(--neutral); font-family:var(--font-mono);}
+  .persona-strip{
+    display:flex; gap:18px; flex-wrap:wrap; font-family:var(--font-mono); font-size:11.5px;
+    color:var(--ink-soft); padding-bottom:10px;
+  }
+  .persona-strip b{color:var(--ink); font-weight:600;}
+  .tabs{display:flex; gap:2px;}
+  .tab-btn{
+    appearance:none; border:none; background:none; cursor:pointer;
+    font-family:var(--font-body); font-weight:600; font-size:14px; color:var(--neutral);
+    padding:10px 18px 12px; border-bottom:2.5px solid transparent; letter-spacing:.01em;
+  }
+  .tab-btn:hover{color:var(--ink);}
+  .tab-btn.active{color:var(--ink);}
+  .tab-btn[data-tab="ftu"].active{border-color:var(--ftu); color:var(--ftu-ink);}
+  .tab-btn[data-tab="ck"].active{border-color:var(--ck); color:var(--ck-ink);}
+  .tab-btn[data-tab="analysis"].active{border-color:var(--ink); }
+  .tab-btn:focus-visible{outline:2px solid var(--ink); outline-offset:2px; border-radius:4px;}
+
+  .page{max-width:1180px; margin:0 auto; padding:28px 24px 90px;}
+  .tab-panel{display:none;}
+  .tab-panel.active{display:block;}
+
+  /* ---- generic card/section system ---- */
+  .section{margin-bottom:44px;}
+  .section-head{display:flex; align-items:baseline; gap:12px; margin-bottom:14px; flex-wrap:wrap;}
+  .section-head h2{font-size:21px;}
+  .section-desc{color:var(--ink-soft); font-size:13.5px; max-width:68ch; margin-top:4px;}
+
+  .card{
+    background:var(--paper-raised); border:1px solid var(--line); border-radius:var(--radius);
+    box-shadow:var(--shadow); padding:18px 20px;
+  }
+  .grid-2{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
+  .grid-3{display:grid; grid-template-columns:repeat(3,1fr); gap:14px;}
+  @media (max-width:760px){ .grid-2, .grid-3{grid-template-columns:1fr;} }
+
+  .badge{
+    display:inline-flex; align-items:center; gap:5px; font-family:var(--font-mono);
+    font-size:10.5px; font-weight:600; letter-spacing:.03em; text-transform:uppercase;
+    padding:2.5px 8px; border-radius:100px; white-space:nowrap;
+  }
+  .badge-ck{background:var(--ck-soft); color:var(--ck-ink);}
+  .badge-ftu{background:var(--ftu-soft); color:var(--ftu-ink);}
+  .badge-both{background:var(--neutral-soft); color:var(--ink-soft);}
+  .badge-critical{background:var(--risk-soft); color:var(--risk);}
+  .badge-major{background:var(--warn-soft); color:var(--warn);}
+  .badge-minor{background:var(--neutral-soft); color:var(--ink-soft);}
+
+  /* ---- Landing / masthead hero on each product tab ---- */
+  .product-hero{
+    display:flex; justify-content:space-between; gap:28px; align-items:flex-end;
+    padding:22px 0 26px; border-bottom:1px solid var(--line); margin-bottom:32px; flex-wrap:wrap;
+  }
+  .product-hero h1{font-size:34px;}
+  .product-hero .tag{font-size:14px; color:var(--ink-soft); margin-top:6px; max-width:52ch;}
+  .stat-row{display:flex; gap:26px; flex-wrap:wrap;}
+  .stat{text-align:right;}
+  .stat .num{font-family:var(--font-mono); font-size:26px; font-weight:600; line-height:1;}
+  .stat .lbl{font-family:var(--font-mono); font-size:10.5px; color:var(--neutral); text-transform:uppercase; letter-spacing:.05em; margin-top:4px;}
+
+  /* ---- Journey flow (arrows) ---- */
+  .journey{display:flex; flex-direction:column; gap:0;}
+  .journey-row{display:flex; align-items:stretch; gap:0;}
+  .journey-node{
+    flex:1; min-width:0; border:1px solid var(--line); border-radius:var(--radius);
+    background:var(--paper-raised); padding:14px 16px; box-shadow:var(--shadow); position:relative;
+  }
+  .journey-arrow{
+    display:flex; align-items:center; justify-content:center; width:34px; flex:0 0 34px;
+    color:var(--neutral);
+  }
+  .journey-arrow svg{width:22px; height:22px;}
+  .journey-stage-label{font-family:var(--font-mono); font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:var(--neutral); margin-bottom:6px;}
+  .journey-shot{
+    width:100%; border-radius:6px; border:1px solid var(--line-soft); cursor:zoom-in;
+    display:block; margin-top:10px; transition:transform .15s ease, box-shadow .15s ease;
+  }
+  .journey-shot:hover{transform:translateY(-2px); box-shadow:var(--shadow);}
+  .journey-caption{font-size:12px; color:var(--ink-soft); margin-top:6px; line-height:1.4;}
+  .journey-price{font-family:var(--font-mono); font-weight:700; font-size:15px;}
+  .journey-vert-connector{
+    width:2px; align-self:center; height:22px; background:repeating-linear-gradient(var(--line) 0 4px, transparent 4px 8px);
+    margin:0 auto;
+  }
+
+  /* ---- Screen catalog grid ---- */
+  .shot-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:14px;}
+  .shot-card{
+    border:1px solid var(--line); border-radius:8px; overflow:hidden; background:var(--paper-raised);
+    box-shadow:var(--shadow); cursor:zoom-in;
+  }
+  .shot-card img{width:100%; display:block; aspect-ratio:16/10; object-fit:cover; object-position:top;}
+  .shot-card .cap{padding:9px 11px; font-size:11.5px; color:var(--ink-soft); line-height:1.35;}
+  .shot-card .cap b{color:var(--ink); display:block; font-size:12px; margin-bottom:2px;}
+
+  /* ---- finding list ---- */
+  .finding{
+    display:flex; gap:14px; padding:14px 0; border-bottom:1px solid var(--line-soft);
+  }
+  .finding:last-child{border-bottom:none;}
+  .finding-rank{font-family:var(--font-mono); font-size:20px; font-weight:600; color:var(--neutral); width:28px; flex:0 0 28px;}
+  .finding-body{flex:1;}
+  .finding-title{font-weight:600; font-size:14.5px; margin-bottom:3px;}
+  .finding-summary{font-size:13px; color:var(--ink-soft); max-width:74ch;}
+  .finding-meta{display:flex; gap:6px; margin-bottom:6px; flex-wrap:wrap;}
+  .finding-evidence{font-family:var(--font-mono); font-size:10.5px; color:var(--neutral); margin-top:5px;}
+
+  /* ---- strengths/weaknesses lists ---- */
+  .sw-list{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:10px;}
+  .sw-list li{padding-left:18px; position:relative; font-size:13.5px;}
+  .sw-list li::before{content:"+"; position:absolute; left:0; color:var(--good); font-weight:700;}
+  .sw-list.weak li::before{content:"–"; color:var(--risk);}
+  .sw-list b{display:block; font-size:13.5px; margin-bottom:2px;}
+  .sw-list .detail{color:var(--ink-soft); font-size:12.5px;}
+  .sw-list .ev{font-family:var(--font-mono); font-size:10px; color:var(--neutral);}
+
+  /* ---- exec summary strip ---- */
+  .exec-strip{display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:8px;}
+  @media (max-width:900px){.exec-strip{grid-template-columns:1fr;}}
+  .exec-card{
+    border-radius:var(--radius); padding:20px 20px 18px; box-shadow:var(--shadow);
+    border:1px solid var(--line); background:var(--paper-raised); position:relative;
+  }
+  .exec-card .exec-num{
+    font-family:var(--font-display); font-size:15px; font-weight:600; color:var(--neutral);
+    margin-bottom:8px;
+  }
+  .exec-card h3{font-size:16px; margin-bottom:8px;}
+  .exec-card p{font-size:12.8px; color:var(--ink-soft); margin:0;}
+
+  /* ---- S2C chart ---- */
+  .chart-wrap{overflow-x:auto;}
+  .legend{display:flex; gap:18px; font-family:var(--font-mono); font-size:11px; margin-bottom:10px; color:var(--ink-soft);}
+  .legend-swatch{display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:5px; vertical-align:-1px;}
+
+  /* ---- SWOT ---- */
+  .swot-grid{display:grid; grid-template-columns:1fr 1fr; grid-template-rows:auto auto; gap:12px;}
+  @media (max-width:700px){.swot-grid{grid-template-columns:1fr;}}
+  .swot-cell{border-radius:var(--radius); padding:16px 18px; border:1px solid var(--line);}
+  .swot-cell h4{font-size:12px; text-transform:uppercase; letter-spacing:.06em; font-family:var(--font-mono); margin-bottom:10px; color:var(--ink-soft);}
+  .swot-cell ul{margin:0; padding-left:18px; font-size:12.5px;}
+  .swot-cell li{margin-bottom:6px;}
+  .swot-s{background:var(--good-soft);}
+  .swot-w{background:var(--risk-soft);}
+  .swot-o{background:var(--ck-soft);}
+  .swot-t{background:var(--warn-soft);}
+
+  /* ---- table ---- */
+  table.data{width:100%; border-collapse:collapse; font-size:12.8px;}
+  table.data th{
+    text-align:left; font-family:var(--font-mono); font-size:10.5px; text-transform:uppercase;
+    letter-spacing:.04em; color:var(--neutral); padding:8px 10px; border-bottom:1.5px solid var(--line);
+  }
+  table.data td{padding:9px 10px; border-bottom:1px solid var(--line-soft); vertical-align:top;}
+  table.data tr:last-child td{border-bottom:none;}
+  .price{font-family:var(--font-mono); font-weight:700;}
+
+  /* ---- modal / lightbox ---- */
+  .lightbox{
+    position:fixed; inset:0; background:rgba(10,12,15,.82); z-index:100;
+    display:none; align-items:center; justify-content:center; padding:5vh 4vw;
+  }
+  .lightbox.open{display:flex;}
+  .lightbox-inner{max-width:min(1100px,92vw); max-height:90vh; display:flex; flex-direction:column; gap:10px;}
+  .lightbox img{max-width:100%; max-height:78vh; border-radius:8px; box-shadow:0 20px 60px rgba(0,0,0,.5); background:#fff;}
+  .lightbox-cap{color:#f2efe6; font-size:13px; font-family:var(--font-body); max-width:80ch;}
+  .lightbox-close{
+    position:absolute; top:22px; right:28px; background:none; border:none; color:#f2efe6;
+    font-size:28px; cursor:pointer; line-height:1;
+  }
+
+  .backlink{font-family:var(--font-mono); font-size:11px; color:var(--neutral);}
+
+  footer.page-footer{
+    max-width:1180px; margin:0 auto; padding:20px 24px 60px; font-family:var(--font-mono);
+    font-size:11px; color:var(--neutral); border-top:1px solid var(--line);
+  }
+
+  ::selection{background:var(--ck-soft);}
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="masthead">
+      <div>
+        <div class="masthead-title">S2C Teardown &mdash; CK Tax vs FreeTaxUSA</div>
+        <div class="masthead-sub">Desktop &middot; single-W2 filer &middot; evidence-first competitive analysis</div>
+      </div>
+    </div>
+    <div class="persona-strip" id="personaStrip"></div>
+    <div class="tabs" role="tablist">
+      <button class="tab-btn active" data-tab="analysis" role="tab">Analysis</button>
+      <button class="tab-btn" data-tab="ftu" role="tab">FreeTaxUSA</button>
+      <button class="tab-btn" data-tab="ck" role="tab">CK Tax</button>
+    </div>
+  </div>
+</div>
+
+<div class="page">
+  <div class="tab-panel active" id="panel-analysis"></div>
+  <div class="tab-panel" id="panel-ftu"></div>
+  <div class="tab-panel" id="panel-ck"></div>
+</div>
+
+<footer class="page-footer">
+  Synthetic test persona &middot; single Wyoming filer, Goods Inc W-2, CA nonresident state-return scenario &middot;
+  no real payment or filing occurred in either traversal &middot; generated from runs/ck &amp; runs/ftu desktop logs
+</footer>
+
+<div class="lightbox" id="lightbox">
+  <button class="lightbox-close" id="lightboxClose" aria-label="Close">&times;</button>
+  <div class="lightbox-inner">
+    <img id="lightboxImg" src="" alt="">
+    <div class="lightbox-cap" id="lightboxCap"></div>
+  </div>
+</div>
+
+<!-- images now referenced directly via assets/ paths, no inline data needed -->
+<script>
+/* ======================= DATA LAYER ======================= */
+function img(key){ return 'assets/' + key + '.png'; }
+
+const DATA = {"_meta": {"generated_by": "synthesis pass over STATUS.md, docs/PROTOCOL.md, config/persona.json, and runs/{ck,ftu}/desktop/phase-{1-7}/{handoff.md,log.json}", "excludes": "runs/_void/** (superseded Jordan Sampleton persona data) entirely ignored per instructions", "scope_note": "Both traversals are DESKTOP-ONLY. No mobile traversal has been performed for either product \u2014 see data_entry_comparison.mobile_first_claims and headline_findings for this gap.", "metric_counting_note": "Screen/click/required-field totals below are computed directly from each phase's log.json (one entry = one screen turn), which is the authoritative per-screen ledger per docs/PROTOCOL.md Section 10. These computed totals differ slightly from some phase handoff.md narrative summaries (e.g. CK's own running narrative said ~98 screens across phases 1-7; the log.json-derived total is 96) due to minor handoff rounding/recap discrepancies \u2014 log.json is treated as ground truth throughout this synthesis. Auth/re-auth interstitial screens (FTU's idle-timeout sign-in prompts) were already excluded from the logs per STATUS.md finding 5 and are not double-counted here.", "phase_labeling_note": "CK and FTU used different phase-folder semantics for the state/final-steps stretch: CK phase-6 = State (California) branch, CK phase-7 = Final Review + Paywall/Payment. FTU phase-6 = State (California) branch, FTU phase-7 = Final Steps (Order Products -> Review -> Submit, to the completion edge). Both are federal-scope-complete after phase 5; phases 6-7 are Vivian-approved scope extensions beyond the original federal-only default, kept segregated from the federal headline totals in the source STATUS.md but INCLUDED here as full-funnel S2C evidence per this task's mandate to cover the whole S2C journey through paywall/checkout."}, "persona": {"filer_name": "Stephen Stalcup", "filing_status": "Single, no dependents", "dob": "1999-05-14", "ssn_note": "400-01-4675, a Vivian-confirmed sanctioned synthetic test SSN (from the source W-2 document); an earlier reserved-dummy SSN 900-70-0000 was used in a superseded/void run and is not part of this synthesis", "resident_state": "Wyoming (789 Pearl Avenue, Uptown, WY 82001) \u2014 WY has no state personal income tax", "employer": "GOODS INC, EIN 55-5555555, 333 Easy Street, Middlefield, CA 94063 (a California-headquartered employer, used deliberately to construct a CA nonresident state-return scenario since WY itself requires no state filing)", "w2_wages_box1": 48062.0, "w2_fed_withholding_box2": 3728.76, "w2_dependent_care_box10": 5000.0, "w2_box12": "D $2,500 (401k elective deferral) + AA $1,000 (Roth 401k)", "w2_box13_retirement_plan_checked": true, "w2_state_boxes_15_17": "blank on the source W-2 (no state wages/withholding printed)", "dependent_care_edge_case": "The filer has a $5,000 Box-10 dependent-care FSA benefit but NO qualifying dependent (Single, zero dependents) \u2014 a deliberate, realistic edge case built into the test persona to see whether each product correctly recognizes that an unused dependent-care benefit generally must be added back to taxable income (IRS Form 2441 treatment), or silently mishandles it.", "final_computed_outcome_both_products": "Total income $53,062 (the $48,062 W-2 wages + the $5,000 Box-10 benefit); Federal tax due $512; CA nonresident state tax $0 (no CA-source income)."}, "metrics": {"ck": {"total_screens": 96, "total_clicks": 92, "total_required_fields": 74, "upsell_count": 10, "phases": [{"phase": 1, "name": "Landing -> auth -> onboarding", "screens": 5, "clicks": 4, "required_fields": 0, "upsells": 2, "key_moment": "Discovery that CK Tax is TurboTax Online with CK-branded chrome; SSO friction bounced through accounts.intuit.com twice; profile-derived pre-fill (Name/DOB) offered and accepted."}, {"phase": 2, "name": "Personal info", "screens": 6, "clicks": 6, "required_fields": 13, "upsells": 0, "key_moment": "SSN deferred to a later, explicitly-optional 'Skip for now' screen (softer than FTU); occupation field is autocomplete-only; zero upsells anywhere in this phase."}, {"phase": 3, "name": "Income / W-2 entry", "screens": 22, "clicks": 24, "required_fields": 27, "upsells": 4, "key_moment": "Mandatory two-step IRS Section 7216 consent gate (data-sharing with Intuit's foreign affiliates); the W-2 'Needs review' stuck-loop cost ~6-9 extra re-confirmation screens for one skipped conditional FSA-leftover field."}, {"phase": 4, "name": "Deductions & credits", "screens": 12, "clicks": 12, "required_fields": 8, "upsells": 0, "key_moment": "HEADLINE FINDING: the Dependent Care Credit 'Needs review' item enters a permanent stuck loop (answering 'No' truthfully never clears it) but does NOT block progress \u2014 'Finish deductions later' advances past it, unresolved and unexplained. Zero upsells in this phase (contrast with FTU's Pro Support interstitial at the same point)."}, {"phase": 5, "name": "Review + wrap-up (Federal)", "screens": 9, "clicks": 6, "required_fields": 2, "upsells": 1, "key_moment": "Federal Review's own automated 'Check my info' pass reports a fully clean bill of health ('Your details look complete') with zero mention of the still-unresolved Dependent Care Credit item \u2014 the review engine that should catch this does not. Federal due confirmed at $512; WY correctly requires no state return."}, {"phase": 6, "name": "State branch (California nonresident)", "screens": 32, "clicks": 35, "required_fields": 24, "upsells": 0, "key_moment": "CA's own 'Smart Check' review (the underlying TurboTax engine's real name, never used in CK's own copy) caught what Federal Review missed: two raw Schedule CA(540NR) worksheet screens revealed that the conversational 'Did you earn all of your income in California?' answer never actually populated the underlying wage-allocation and dependent-care-benefit fields on the real tax form."}, {"phase": 7, "name": "Final review + Paywall/Payment", "screens": 10, "clicks": 5, "required_fields": 0, "upsells": 3, "key_moment": "THE PAYWALL: Federal $0 + CA State $15 = $15 subtotal, shown together with a live credit-card payment form and a PLUS bundle upsell ($29) directly on the same screen; a pre-checked 'store payment method' consent checkbox; cart-removal exists but only via State > 'Status of your state returns', not from the payment screen itself."}]}, "ftu": {"total_screens": 83, "total_clicks": 87, "total_required_fields": 86, "upsell_count": 13, "phases": [{"phase": 1, "name": "Landing -> auth -> onboarding", "screens": 2, "clicks": 2, "required_fields": 0, "upsells": 1, "key_moment": "Public landing page discloses federal $0 / state $15.99 hero pricing plus Deluxe $7.99, Pro Support $64.99, and Audit Defense $19.99 all up front, before any account interaction. Signup itself was NOT measured (pre-made account used per methodology decision)."}, {"phase": 2, "name": "Personal info", "screens": 6, "clicks": 6, "required_fields": 11, "upsells": 1, "key_moment": "SSN and DOB are both mandatory on the very FIRST personal-info screen (9 required fields, heavy_form + sensitive_data_request flags) \u2014 no skip path, unlike CK. Deluxe $7.99 full-screen interstitial appears right after the personal summary."}, {"phase": 3, "name": "Income / W-2 entry", "screens": 11, "clicks": 12, "required_fields": 20, "upsells": 0, "key_moment": "The single W-2 form is the heaviest screen in the whole FTU flow (~13 required + ~40 optional fields on one page) but entered in ONE screen turn (vs CK's structural split across ~5 screens). Box-10 dependent-care benefit with no qualifying dependent CORRECTLY computed: added back to taxable income automatically ($48,062 -> $53,062 total income), with zero stuck loops."}, {"phase": 4, "name": "Deductions & credits", "screens": 17, "clicks": 19, "required_fields": 12, "upsells": 1, "key_moment": "Pro Support $64.99 full-screen interstitial gates the Income->Deductions transition. ~13 individual yes/no screeners each as its own screen turn is the main driver of this phase's high screen count; two screeners have no pre-selected default, forcing an extra click."}, {"phase": 5, "name": "Federal review + wrap-up", "screens": 5, "clicks": 5, "required_fields": 1, "upsells": 1, "key_moment": "HARD STOP at the Federal Tax Summary: AGI $53,062, taxable income $37,312, total tax $4,241, withholding $3,729, amount owed $512 \u2014 full computed return shown with a downloadable PDF. A third Pro Support exposure appears as a passive in-card offer just before this."}, {"phase": 6, "name": "State branch (California nonresident)", "screens": 29, "clicks": 29, "required_fields": 38, "upsells": 2, "key_moment": "Wyoming itself NEVER reaches the state paywall (FTU declines to even create a chargeable WY return). A CA nonresident return was built specifically to reach the paywall: 'Order Products' screen shows Federal FREE + California State Return $15.99 = Total $15.99, alongside an add-on grid (Audit Defense $19.99, Deluxe $7.99, Pro $64.99, printed/bound copies). CA return computes $0 tax \u2014 pure e-file access fee. A risky default (2024 CA-return question defaulted to Yes for a first-time filer) was caught and corrected."}, {"phase": 7, "name": "Final Steps (Order Products -> Review -> Submit)", "screens": 13, "clicks": 14, "required_fields": 4, "upsells": 7, "key_moment": "CA state return removed from cart via a retention/save-the-sale dialog with dubious 'must file by 4/15' copy, then chased by FOUR separate add-back nudges through the rest of Final Steps. A dedicated Audit Defense $19.99 interstitial fires AFTER checkout. Free $0 federal path required NO payment instrument at all. E-file was preemptively blocked by the invalid test EIN, routing to a mail-in path. TERMINAL: 'Finish Tax Return' button captured, not clicked."}]}}, "s2c_journey_steps": [{"stage": "Account creation / auth", "ck": {"summary": "CK entry is via an already-authenticated Credit Karma account; clicking 'File federal for $0' redirects through accounts.intuit.com into a completely different domain/app (TurboTax Online). Being signed into creditkarma.com did not carry over \u2014 a full sign-in/account-linking prompt appeared twice before landing authenticated in TurboTax.", "screen_count": 5, "friction_notes": "Real, measurable SSO friction: a user who just authenticated on creditkarma.com is asked to sign in again (twice) on a visually distinct accounts.intuit.com domain before reaching the actual tax product. Not measured: CK account signup itself (traversal started from an existing CK account)."}, "ftu": {"summary": "FTU entry is via a pre-made, already-authenticated account (per project methodology, to keep the desktop/mobile comparison symmetric); the public marketing landing page was captured for pricing but account signup itself was not traversed.", "screen_count": 2, "friction_notes": "No SSO/redirect friction (single domain throughout). Real user-facing friction noted separately: FTU's session times out after ~6-8 idle minutes, requiring re-authentication mid-traversal multiple times (excluded from headline metrics as a tooling artifact, but flagged as genuine product friction for the report narrative)."}}, {"stage": "General info / personal info", "ck": {"summary": "CK/TurboTax pre-fills Name and DOB from the CK profile itself; defers SSN to a later, explicitly optional 'Skip for now' screen framed as unlocking tax credits; occupation is an autocomplete-only combobox (plain text alone fails).", "screen_count": 6, "friction_notes": "No SSN/DOB on the first screen (softer sensitive-data framing than FTU). Zero upsells anywhere in this phase \u2014 a genuine CK-favorable contrast."}, "ftu": {"summary": "FTU requires SSN and DOB on its very first personal-info screen (9 required fields in one heavy form, no skip option), with a Deluxe $7.99 full-screen upsell interstitial appearing immediately after the personal-info summary, before Income begins.", "screen_count": 6, "friction_notes": "heavy_form + sensitive_data_request flags on screen 1; a forced_upsell_interstitial flag on the Deluxe screen (declinable in 1 click, but placed at a momentum point)."}}, {"stage": "Income / W-2 entry", "ck": {"summary": "A mandatory two-step IRS Section 7216 consent gate (data-sharing with Intuit's foreign affiliates, including Canada and India entities) appears immediately before Income, with no FTU equivalent. W-2 entry is then split across ~5 structural screens (employer/employee info, boxes 1-14, boxes 15-20, uncommon-situations checklist, Box-10 follow-ups), and a 'Needs review' bug forced a ~6-9 screen re-walk of the entire W-2 for one skipped conditional field (an unadvertised 'leftover FSA amount' textbox).", "screen_count": 22, "friction_notes": "The single most consequential data-sharing disclosure text observed in either product is in this phase. The 'Needs review' stuck-loop is a major, quantifiable UX cost: roughly a quarter of this phase's total screens were pure re-confirmation, not new information."}, "ftu": {"summary": "FTU's W-2 is entered on a single dense screen (~13 required + ~40 optional fields \u2014 the heaviest screen in the whole FTU flow) rather than split across multiple screens. The Box-10 dependent-care benefit with no qualifying dependent is CORRECTLY and automatically added back to taxable income at this stage, with zero stuck loops or unresolved flags.", "screen_count": 11, "friction_notes": "A non-blocking soft-validation advisory for an invalid-format EIN (continued past, correctly not a hard block) is a positive product behavior. Two consecutive, near-duplicate W-2 summary screens (s07 + s08) are a minor redundancy."}}, {"stage": "Deductions & credits", "ck": {"summary": "Standard-vs-itemize is a single clean, pre-recommending screen. The Dependent Care Credit item surfaces here as 'Needs review' and enters a genuine, confirmed infinite loop: answering 'No' truthfully never clears the flag, and re-entering it shows the identical unresolved question every time.", "screen_count": 12, "friction_notes": "HEADLINE FINDING: this is a real correctness/transparency gap, not just friction. The flag does not block progress ('Finish deductions later' advances past it unresolved), and the final Deductions summary screen presents full confidence with no mention of the unresolved item. Zero upsells in this phase."}, "ftu": {"summary": "FTU walks ~13 individual yes/no deduction and credit screeners as separate screen turns (Tips/Overtime, IRA, College Tuition, Student Loan Interest, Teacher Expenses, EIC auto-eval, New Car Loan Interest, Home Energy, and a Box-10-triggered dependent-care carryover/forfeiture pair), most defaulted to 'No' for speed.", "screen_count": 17, "friction_notes": "A Pro Support $64.99 full-screen interstitial gates the Income->Deductions transition (the second paid interstitial of the traversal after Deluxe). Two screeners (College, Home Energy) have no pre-selected default, forcing an extra click each \u2014 a small, real consistency gap."}}, {"stage": "Federal review", "ck": {"summary": "A clean data-recap screen followed by an automated 'Check my info' pass that reports 'Your federal return is in great shape... Your details look complete' \u2014 with zero acknowledgment of the still-unresolved Dependent Care Credit item from Deductions & Credits.", "screen_count": 9, "friction_notes": "HEADLINE FINDING: this is CK's own review/safety-net engine, and it does not catch the exact scenario it should exist to catch. Federal due confirmed at $512."}, "ftu": {"summary": "FTU's federal review culminates directly in the Federal Tax Summary screen showing the fully itemized computed return (AGI, deductions, taxable income, total tax, credits, payments, amount owed) with a downloadable PDF \u2014 no separate 'clean bill of health' messaging layer sits between the numbers and the filer.", "screen_count": 5, "friction_notes": "A third Pro Support exposure appears as a passive in-card offer on the progress interstitial just before the summary. FTU's free 'Refund Maximizer' deep-screener option was declined (chose the shortest legitimate path) per protocol."}}, {"stage": "State handoff / state return", "ck": {"summary": "Wyoming correctly requires no state return ('Lucky you - your state does not have a personal income tax' \u2014 near-identical wording to FTU's own WY screen). A CA nonresident return was built to reach the paywall. CA's own 'Smart Check' review (the real TurboTax engine name, never used in CK's own copy) caught what Federal Review missed: two raw Schedule CA(540NR) worksheet screens revealed the conversational 'Did you earn all of your income in California?' answer never actually populated the underlying wage-allocation and dependent-care-benefit fields.", "screen_count": 32, "friction_notes": "MAJOR FINDING: the same category of conversational-answer-doesn't-propagate-to-the-real-form bug that caused the federal Dependent Care Credit loop reappears here, on the state side, caught only by a jarring raw-worksheet UI (a stark departure from CK's otherwise fully conversational interface \u2014 direct evidence the polished chrome sits over TurboTax's native engine)."}, "ftu": {"summary": "Wyoming NEVER reaches the state paywall at all \u2014 FTU declined to even create a chargeable WY return once residency/no-other-state-income was confirmed. A CA nonresident return was built (defensible: Goods Inc is a CA employer) to reach FTU's own $15.99 paywall, walking ~22 CA-specific screens to the 'Order Products' checkout.", "screen_count": 29, "friction_notes": "A risky default was caught: 'Did you file a CA return for 2024?' defaulted to Yes for a first-time filer (had to be manually flipped to No). The screen immediately before checkout is literally named 'Reinforce State Value' \u2014 an explicit value-justification interstitial ahead of the charge."}}, {"stage": "Final review", "ck": {"summary": "Final Review re-confirms combined Federal ($512 due) + State ($0 CA refund) numbers, offers a soft optional 'Don't leave money on the table' tax-break double-check (declined, no price shown, not a real upsell), then proceeds to the Final Steps checklist.", "screen_count": 4, "friction_notes": "Included within Phase 7's total; Final Review and the paywall are combined into the same phase folder for CK."}, "ftu": {"summary": "FTU's 'Review Tax Return' is Step 2 of its own 3-step Final Steps stepper: view/download the federal PDF, alongside three yellow advisory alerts (dependent-care add-back explanation, invalid-EIN e-file-block warning, and a CA-purchase nudge occupying a numbered review step).", "screen_count": 2, "friction_notes": "Notable transparency positive: FTU explicitly explains the $5,000 dependent-care add-back to the filer in its alerts, in contrast to CK never surfacing the equivalent explanation anywhere."}}, {"stage": "Paywall / checkout", "ck": {"summary": "THE CK PAYWALL: Federal $0 + California state return $15 = $15 subtotal, shown together on ONE screen alongside a live credit-card payment form (card number/expiration/CVV/name) with a pre-filled billing address and a PRE-CHECKED 'store payment method with Intuit' consent checkbox. A $29 'PLUS' bundle upsell (Audit Defense + pay-with-refund + Identity Theft Insurance) is shown directly on the same payment screen.", "screen_count": 1, "friction_notes": "DARK-PATTERN-ADJACENT FINDING: the pre-checked payment-method-storage consent is opt-out-by-inaction. No cart-item-removal control exists on the payment screen itself; a filer must navigate back through the State section's 'Status of your state returns' table to find a (real, but buried) trash-can delete icon."}, "ftu": {"summary": "THE FTU PAYWALL ('Order Products'): Federal FREE + California State Return $15.99 = Total $15.99, presented as a distinct cart-review screen SEPARATE from payment entry, with an explicit 'Remove California State Return' control directly on the same page, plus an a-la-carte add-on grid (Audit Defense $19.99 with '10K+ bought in past week' social proof, Deluxe $7.99, Pro Support $64.99, printed/bound copies).", "screen_count": 1, "friction_notes": "Cart removal is directly accessible on the checkout screen itself (a real UX advantage over CK's buried control), but removal triggers a retention/save-the-sale dialog with dubious 'you'll still need to file by April 15, 2026' copy for a filer whose $0-liability nonresident return arguably isn't required at all, followed by four separate post-removal add-back nudges through the rest of the flow."}}, {"stage": "File / submit (terminal)", "ck": {"summary": "CK's traversal terminal artifact is the payment screen itself (ck-desktop-p7-s05), reached via 'Just three more steps and we'll file your returns' -> Step 1 'Review your order'. The traversal explored further (View payment options panel: File Now Pay Later / IRS payment plan, both zero-payment-data; located the buried cart-removal control) without ever entering payment data or clicking 'Confirm payment'.", "screen_count": 10, "friction_notes": "CK does not appear to expose a distinct e-signature/attestation + final 'Finish/Submit' control the way FTU does within the traversed depth \u2014 the payment screen itself, with 'Confirm payment' visible but unclicked, is the deepest point reached."}, "ftu": {"summary": "FTU's terminal screen is 'Let's send in your tax return!' (Step 3 of 3, 'Submit Tax Return') with an attestation checkbox ('I understand that I'll need to print and mail in my taxes' \u2014 left unchecked) and a 'Finish Tax Return' button, captured but never clicked. E-file was preemptively blocked by the invalid test EIN, routing to a mail-in completion path instead of a true e-file transmit control.", "screen_count": 13, "friction_notes": "A genuinely reached, literal completion-edge screen \u2014 the deepest point either product's traversal reached in this project. The free ($0) federal path required NO payment instrument at any point, a strong positive finding for FTU's free tier."}}], "tedium_comparison": {"chart_data": {"phases": ["P1 Landing/Auth", "P2 Personal Info", "P3 Income/W-2", "P4 Deductions/Credits", "P5 Federal Review", "P6 State (CA)", "P7 Final/Paywall"], "ck_screens": [5, 6, 22, 12, 9, 32, 10], "ftu_screens": [2, 6, 11, 17, 5, 29, 13], "ck_clicks": [4, 6, 24, 12, 6, 35, 5], "ftu_clicks": [2, 6, 12, 19, 5, 29, 14], "ck_required_fields": [0, 13, 27, 8, 2, 24, 0], "ftu_required_fields": [0, 11, 20, 12, 1, 38, 4]}, "totals": {"ck_screens": 96, "ftu_screens": 83, "ck_clicks": 92, "ftu_clicks": 87, "ck_required_fields": 74, "ftu_required_fields": 86}, "narrative": "CK logs more total screens (96 vs 83), driven almost entirely by two structural patterns unique to CK: (1) the W-2 'Needs review' stuck-loop in Phase 3, which alone cost ~6-9 screens of pure re-confirmation for one skipped conditional field, and (2) CK's State/CA phase being the single largest phase either product produced (32 screens) due to ~45-item and ~24-item state-specific adjustment/credit catalogs plus raw Schedule CA(540NR) worksheet review screens. FTU logs more total required fields (86 vs 74) because it concentrates data entry onto fewer, denser screens (e.g. the ~13-required-field single-screen W-2 vs CK's ~5-screen split W-2, and FTU's ~9-yes/no-question single-screen CA special-situations checklist) rather than spreading required fields thinly across more screens. Neither pattern is simply 'better' \u2014 CK's screen count is partly a genuine product bug (the review loop) and partly structural chunking; FTU's field density trades fewer screens for heavier individual forms."}, "guidance_comparison": {"jargon_examples": [{"concept": "Dependent Care Credit / Box 10 FSA benefit with no qualifying dependent", "ck_handling": "Never explained in plain language. The 'Needs review' flag on the Dependent Care Credit line item gives no indication of what is wrong or what Form 2441 requires; both the Deductions summary and Federal Review present a fully clean, confident status while silently carrying the unresolved item forward. A filer would have no way to learn their $5,000 benefit might need to be added back to taxable income.", "ftu_handling": "Handled with an explicit, plain-language explanation. The Phase-3 Income Summary directly shows the $5,000 added into Total Income ($48,062 -> $53,062), and Phase 7's Tax Return Alerts screen explicitly calls this out: 'Dependent Care Benefits Added to Income' with a jump-link explanation. This is a genuine, evidence-backed guidance/transparency advantage for FTU."}, {"concept": "'Needs review' error messaging (CK-specific)", "ck_handling": "The W-2 Summary's 'Needs review' status gives a generic, non-specific alert ('You'll need to review or add missing information') with no jump-to-problem affordance; the actual missing field (a conditional FSA-leftover-amount textbox) is only discoverable by re-walking the entire multi-screen W-2 sequence from the top.", "ftu_handling": "N/A as a direct comparison point (FTU's equivalent W-2 flow did not produce an analogous stuck-loop in this traversal), but FTU's general alert pattern (see 'Invalid EIN' below) is consistently specific and named."}, {"concept": "Soft-validation / non-blocking advisories (address and EIN mismatches)", "ck_handling": "CK's address-mismatch advisory ('We couldn't match the street number and name combo you entered with any USPS records... If this address looks right, just keep going') is clear, non-blocking, and does not name a specific field code.", "ftu_handling": "FTU's invalid-EIN advisory ('You have entered an invalid Employer Identification Number (EIN) in Box B') is similarly non-blocking but explicitly names the exact box/field and, later in Final Steps, escalates into a specific, well-explained consequence ('The IRS will reject an e-filed return with an invalid EIN... we'll help you mail your return instead') \u2014 a slightly more complete disclosure loop than CK's equivalent."}, {"concept": "IRS Section 7216 data-sharing consent (CK/TurboTax-specific; no direct FTU equivalent observed)", "ck_handling": "A two-step, legally mandated consent form appears immediately before Income, with an outer card that visually implies mandatory 'Review and sign' (no visible Decline) even though a genuine Decline option exists one level deeper. Step 2's text is the single most consequential data-sharing disclosure observed in either product, naming SSN/income/deductions sharing with Intuit's foreign affiliates (Canada, India) for up to 5 years, for marketing/profile-building purposes. A post-consent banner reframes this as 'save up to 12 minutes' \u2014 persuasion, not disclosure.", "ftu_handling": "No equivalent screen was observed anywhere in the comparable part of FTU's flow \u2014 this is a CK/TurboTax-specific structural element, not a jargon-translation contrast per se, but a meaningful trust/transparency difference worth flagging on its own."}], "qa_style_notes": {"ck_pattern": "Predominantly conversational, single-question-at-a-time or short progressive-reveal screens with warm, reassuring copy ('Savings might be heading your way', 'We lowered your taxes as much as possible!'). This conversational layer is visually consistent almost everywhere EXCEPT the raw Schedule CA(540NR) worksheet screens in the State/CA phase, which are a jarring, unstyled departure \u2014 direct visual evidence that CK's chrome sits over TurboTax's native engine, since the native engine's own raw-form UI surfaces when the conversational layer's logic gaps are caught by CA's 'Smart Check' review.", "ftu_pattern": "Predominantly plain-form, Q&A-style screens closely mirroring literal IRS form structure and box numbers (e.g. 'Box 10 Dependent Care', 'Box 12 code D/AA') with minimal narrative framing \u2014 closer to filling out a paper form with a helpful assistant than a guided conversation. This is consistent with the reddit_trust_narrative below: FTU reads as an actual tax form throughout, not just in occasional worksheet screens.", "label_consistency_gap_ck": "CK/TurboTax uses at least four distinct label-text variants for a negative ('No') answer across different screeners in the same product ('No, I didn't' / 'No, they didn't' / plain 'No' / 'No, I don't want to') \u2014 a minor but real internal-consistency issue not observed to the same degree in FTU.", "evidence_gap": "Neither traversal deeply probed FTU's help-text/jargon-explanation QUALITY beyond what appeared inline on-screen (e.g. no systematic test of FTU's 'More Information' or FAQ-accordion content depth) \u2014 this is a genuine gap; FTU's jargon-translation quality is inferred only from its plain, form-literal labeling style, not independently scored against CK's."}}, "data_entry_comparison": {"w2_entry": {"ck_approach": "Structurally split across ~5 screens for one simple W-2 (employer/employee info -> boxes 1-14 -> boxes 15-20 -> W-2-specific uncommon-situations checklist -> Box-10 follow-up screeners), expanding to ~9 screens including the stuck-loop re-walk. Employee name/address pre-filled from the Personal Profile entered earlier in the same product (SSN did NOT carry over, had to be retyped). Two-tier import fork: EIN auto-fill (left blank per protocol) -> second-tier Snap-a-photo/Upload/Try-again fork -> plain 'Type it in myself' manual link.", "ftu_approach": "Entered on a SINGLE dense screen (~13 required + ~40 optional fields \u2014 the single heaviest screen in FTU's entire flow), immediately followed by a separate payer-info confirmation screen. Box A SSN was pre-filled (matching the filer) but employee name/address required no separate Phase-2 pre-fill carryover check since it was all on one form. Import fork offered Upload-a-file / Scan-with-phone alongside manual entry, chosen per protocol.", "pre_fill_differentiator": "CK's ability to carry Personal Profile data (name, address) forward into the W-2 form automatically is a genuine, measurable advantage over FTU, which required the filer to re-enter this info in the W-2 context too (though FTU's SSN pre-fill from Personal Info onto the W-2's Box A did work, unlike CK's, which required re-typing the SSN)."}, "screen_count_vs_field_density_tradeoff": "CK trades fewer fields per screen for more screens (finer-grained wizard steps); FTU trades more fields per screen for fewer screens (denser single-page forms). Neither is unambiguously superior from a pure friction-count standpoint \u2014 CK's approach is more forgiving of interruption (smaller units of work) but more vulnerable to review-loop bugs like the one observed; FTU's approach front-loads more cognitive load per screen but completes faster when nothing goes wrong.", "mobile_first_claims": {"status": "GAP \u2014 NOT YET TESTED. No mobile traversal has been run for either product (ck-mobile and ftu-mobile are both still pending per STATUS.md checklist items 8-9, blocked respectively on CK's 2FA inbox access and FTU's need for a fresh/reset account). Any claim either product makes about being 'mobile-first' or mobile-optimized is UNVERIFIED by this teardown and should not be treated as an established finding. This is flagged explicitly here rather than inferred or fabricated from the desktop evidence."}}, "monetization_comparison": {"ck_pricing": {"federal": "$0 (disclosed repeatedly: Phase 1 landing, Phase 5 federal/state boundary, and the Phase 7 paywall itself, consistently '100% free federal taxes')", "state": "$15 per state (California, in this traversal)", "checkout_subtotal": "$15 (Federal $0 + CA state $15)", "plus_bundle_upsell": "$29 \u2014 'PLUS' bundle combining Audit Defense + pay-with-refund convenience + Identity Theft Insurance, shown as a single bundled offer directly on the payment screen itself (not a separate interstitial)", "zero_data_payment_options": "'File Now, Pay Later' (third-party BNPL-style financing) and 'Get an IRS payment plan', both surfaced in a 'View payment options' panel without requiring any payment data entry \u2014 these address the underlying TAX BILL, not CK's own state-filing fee"}, "ftu_pricing": {"federal": "Free (disclosed on the landing page and reconfirmed at $0.00 on the Order Summary once the CA state return was removed)", "state": "$15.99 per state (California, in this traversal) \u2014 Wyoming itself never reaches this price point since FTU declines to create a chargeable WY return", "checkout_subtotal": "$15.99 (Federal FREE + CA $15.99), shown on the 'Order Products' screen distinct from payment entry", "a_la_carte_upsells": "Deluxe Support $7.99 (Phase 2, personal-info seam), Pro Support $64.99 (surfaced three times: Phase 4 full interstitial, Phase 5 passive in-card, and again referenced at landing), Audit Defense $19.99 (shown at landing AND as a dedicated post-checkout interstitial in Phase 7 \u2014 a second bite at the wallet after the cart is already settled)", "zero_data_payment_options": "For the underlying IRS tax bill: 'Pay on my own' fork offering mail-voucher (Form 1040-V, zero data), IRS online account, IRS Direct Pay (no fee), or third-party card payment (2.5% surcharge, listed FIRST in the list despite carrying a fee)"}, "upsell_placement_diff": "CK concentrates its primary monetization into ONE bundled $29 offer shown once, directly on the payment/checkout screen, alongside the state fee itself. FTU spreads FOUR distinct paid products (Deluxe $7.99, Pro Support $64.99 x3 exposures, Audit Defense $19.99 x2 exposures including one AFTER checkout, and the state return itself) across at least five different points in the flow, including a notable post-checkout Audit Defense interstitial that fires even after the cart has been settled at $0.", "state_handoff_findings": "Both products compute EXACTLY $0 CA tax liability for the identical nonresident scenario (no CA-source income), confirming in both cases that the state charge is a pure prep/e-file access fee, not a tax-liability-driven cost. CK is $0.99 cheaper per state at the literal point of payment ($15 vs $15.99) \u2014 the same $0.99 gap disclosed on CK's very first content screen. A key structural difference: Wyoming NEVER triggers FTU's paywall at all (FTU refuses to create a chargeable WY return for a no-other-state-income filer), whereas CK's equivalent WY screen was similarly non-chargeable, but this project did not test whether CK would behave identically to FTU in refusing a WY-state-return creation attempt (CK's traversal moved directly to 'Choose a state' -> California without probing a parallel 'try to force a WY return' test the way FTU's traversal did).", "cart_removal_mechanics": "CK's delete control exists (a real trash-can icon on the 'Status of your state returns' table) but is NOT reachable from the payment/checkout screen itself \u2014 a filer must navigate back through the left-rail 'State' link, then to 'Go to state return', to reach it. FTU's removal control ('Remove California State Return') is directly on the same 'Order Products' checkout screen the price is shown on \u2014 a meaningfully more direct/accessible mechanic. However, FTU's removal then triggers a retention/save-the-sale dialog with dubious urgency copy ('you'll still need to file your CA return by April 15, 2026' \u2014 questionable for a $0-liability nonresident return that likely isn't required at all) and FOUR subsequent add-back nudges through the rest of the flow, a persistence pattern CK's traversal did not exhibit (CK's traversal did not attempt an actual removal, so a like-for-like comparison of CK's post-removal behavior is unavailable).", "payment_method_defaults": "CK's payment screen carries a PRE-CHECKED 'I give my permission to Intuit to store the payment method' consent checkbox \u2014 an opt-out-by-inaction pattern flagged as dark-pattern-adjacent, since a filer who doesn't notice the checkbox implicitly consents to card storage. FTU's traversal never reached an equivalent payment-method-storage consent screen because the cart settled at $0.00 before any payment form was reached (federal free, CA state removed) \u2014 so a direct comparison of FTU's own default-checkbox behavior on a PAID checkout is a genuine evidence gap in this teardown (FTU's $15.99 state-return payment screen itself was never reached with a live card form, since the traversal removed the state return before paying).", "zero_data_payment_options": "Both products offer at least one path to defer/spread the underlying tax bill without entering payment data: CK offers 'File Now, Pay Later' (BNPL-style) and an IRS payment plan link; FTU offers a mail-voucher (Form 1040-V) path, an IRS online account link, and IRS Direct Pay. Both explicitly avoid requiring payment-instrument data for these deferred/self-pay paths, consistent with each product's guardrail-compliant traversal."}, "headline_findings": [{"rank": 1, "title": "CK Tax's underlying filing engine IS TurboTax Online, not an independent CK product", "product": "ck", "severity": "critical", "summary": "Clicking 'File federal for $0' on creditkarma.com/finances redirects through accounts.intuit.com into us-west-2.turbotaxonline.intuit.com, running the ty25usindprod TurboTax build with appTheme=creditkarma. The in-product page title reads 'Free Credit Karma Tax 2025' but every URL, backend, and even the review engine's own name ('Smart Check', never used in CK's copy) is TurboTax's.", "evidence_source": "ck-desktop phase-1 log.json s02-s03; phase-6 log.json s30"}, {"rank": 2, "title": "CK's Dependent Care Credit stuck-loop is a silent correctness/transparency gap that survives Federal Review", "product": "ck", "severity": "critical", "summary": "A $5,000 Box-10 dependent-care benefit with no qualifying dependent triggers a permanent 'Needs review' flag that answering truthfully never clears; the flag does not block progress, and CK's own automated Federal Review ('Check my info') reports a fully clean bill of health with zero mention of the unresolved item. A real filer could file with this silently unresolved.", "evidence_source": "ck-desktop phase-4 log.json s07-s10; phase-5 log.json s05"}, {"rank": 3, "title": "The same conversational-answer-doesn't-propagate-to-the-real-form bug reappears in CK's CA nonresident state worksheet", "product": "ck", "severity": "major", "summary": "The friendly 'Did you earn all of your income in California?' Yes/No question (answered No) never actually populated the underlying Schedule CA(540NR) wage-allocation and dependent-care-benefit fields; only CA's own 'Smart Check' review caught it via raw, unstyled worksheet screens \u2014 a jarring UI departure that is itself evidence CK's conversational chrome sits over TurboTax's native engine.", "evidence_source": "ck-desktop phase-6 log.json s17, s26-s30"}, {"rank": 4, "title": "FTU correctly and transparently resolves the identical dependent-care edge case that CK mishandles", "product": "ftu", "severity": "major", "summary": "FTU automatically added the $5,000 Box-10 benefit back to taxable income ($48,062 -> $53,062) and later explicitly explained this add-back to the filer as a named 'Tax Return Alert' \u2014 a direct, evidence-backed contrast to CK's silent, unresolved handling of the exact same edge case on the exact same source W-2 data.", "evidence_source": "ftu-desktop phase-3 log.json s11; phase-7 log.json s10"}, {"rank": 5, "title": "CK bundles one $29 upsell at checkout; FTU spreads four distinct paid products across the flow, including a post-checkout ambush", "product": "both", "severity": "major", "summary": "CK shows a single PLUS bundle ($29) once, on the payment screen itself. FTU exposes Deluxe ($7.99), Pro Support ($64.99, three times), Audit Defense ($19.99, twice \u2014 once AFTER the cart is already settled at $0), and the state fee itself, at five-plus distinct points.", "evidence_source": "ck-desktop phase-7 log.json s05; ftu-desktop phase-2 s05, phase-4 s01, phase-5 s01, phase-7 s04"}, {"rank": 6, "title": "CK's mandatory IRS Section 7216 consent gate has no FTU equivalent and is the most consequential data-sharing disclosure in either product", "product": "ck", "severity": "major", "summary": "A two-step consent form (outer card visually implies mandatory 'Review and sign', though a genuine Decline exists one level deeper) discloses SSN/income/deductions sharing with Intuit's foreign affiliates in Canada and India for up to 5 years, for marketing purposes \u2014 then reframes the consent as 'save up to 12 minutes' after signing.", "evidence_source": "ck-desktop phase-3 log.json s01, s03-s04"}, {"rank": 7, "title": "Both products charge a pure e-file access fee for a $0-liability CA nonresident state return, but Wyoming behaves very differently between the two", "product": "both", "severity": "major", "summary": "Both CK ($15) and FTU ($15.99) compute exactly $0 CA tax for the identical nonresident scenario, confirming the state fee is prep/e-file access, not tax-liability-driven. FTU explicitly refuses to create a chargeable Wyoming return at all (no-income-tax states escape its paywall entirely); CK's traversal did not directly test whether CK would behave the same way for WY.", "evidence_source": "ck-desktop phase-7 log.json s05; ftu-desktop phase-6 log.json s05-s06, s26, s29"}, {"rank": 8, "title": "CK's pre-checked payment-method-storage consent checkbox is an opt-out-by-inaction dark-pattern-adjacent finding", "product": "ck", "severity": "major", "summary": "The live payment form at CK's paywall includes an 'I give my permission to Intuit to store the payment method' checkbox that is PRE-CHECKED by default, not opt-in-by-action. FTU's equivalent screen was never reached (its state return was removed before payment), leaving this as an evidence gap on FTU's side but a confirmed finding on CK's.", "evidence_source": "ck-desktop phase-7 log.json s05"}, {"rank": 9, "title": "FTU's cart-removal control is directly on the checkout screen; CK's is buried and only reachable by navigating back through State", "product": "ftu", "severity": "minor", "summary": "FTU's 'Remove California State Return' sits on the same Order Products screen as the price. CK's equivalent (a real trash-can icon) exists only on the 'Status of your state returns' table, reachable by leaving the payment screen and navigating back through the left-rail State section.", "evidence_source": "ck-desktop phase-7 log.json s07, s10; ftu-desktop phase-7 log.json s01-s03"}, {"rank": 10, "title": "CK requires SSN on a later, explicitly-optional screen; FTU requires it (with DOB) on the very first personal-info screen", "product": "ck", "severity": "minor", "summary": "CK's SSN screen is framed with an explicit 'Skip for now' option and pitched as unlocking tax credits. FTU has no skip path \u2014 SSN and DOB are both mandatory on screen one, alongside 7 other required fields.", "evidence_source": "ck-desktop phase-2 log.json s05; ftu-desktop phase-2 log.json s01"}, {"rank": 11, "title": "No mobile traversal has been performed for either product", "product": "both", "severity": "major", "summary": "ck-mobile and ftu-mobile are both still pending (blocked on CK's 2FA inbox access and FTU's need for a fresh/reset account respectively per STATUS.md). Any conclusion about mobile experience, mobile-first design claims, or responsive quality for either product is unverified by this teardown.", "evidence_source": "STATUS.md checklist items 8-9 (unchecked)"}, {"rank": 12, "title": "FTU's post-checkout Audit Defense interstitial and four-nudge state-return chase are aggressive retention/re-sell patterns", "product": "ftu", "severity": "minor", "summary": "After the CA state return is removed and the cart settles at $0, FTU still surfaces a dedicated Audit Defense $19.99 interstitial, then chases the removed state return with four separate add-back nudges (product card, order-summary note, formal return alert, and a numbered review step) through the rest of the flow.", "evidence_source": "ftu-desktop phase-7 log.json s03-s04, s05, s10, s11"}], "ck_strengths": [{"title": "Profile-derived identity pre-fill", "detail": "CK bootstraps Name/DOB directly from the filer's existing Credit Karma profile data \u2014 a capability FTU structurally cannot replicate, since FTU has no prior relationship with a new filer.", "evidence": "ck-desktop phase-1 log.json s04"}, {"title": "Softer, later-and-optional SSN ask", "detail": "SSN collection is deferred to a dedicated, explicitly skippable screen framed around unlocking tax credits, rather than a bare mandatory field on the very first screen.", "evidence": "ck-desktop phase-2 log.json s05"}, {"title": "Zero upsells in Deductions & Credits and Personal Info", "detail": "Two full phases of the CK traversal (Personal Info, Deductions & Credits) had no upsell or paywall interstitials at all, in direct contrast to FTU hitting a paid interstitial at the equivalent point in both phases.", "evidence": "ck-desktop phase-2 and phase-4 log.json (upsell: null throughout)"}, {"title": "Live, always-visible running tax-due tracker", "detail": "A persistent 'Federal due' figure appears in the top toolbar as soon as the first W-2 completes, updating in real time as more income/deductions are entered \u2014 a transparency-forward UX affordance not observed in FTU's equivalent screens.", "evidence": "ck-desktop phase-3 log.json s20"}, {"title": "Consolidated, bundled checkout upsell", "detail": "CK shows exactly one $29 bundled upsell, once, directly on the payment screen \u2014 simpler and less repetitive than FTU's four-plus separate paid-product exposures.", "evidence": "ck-desktop phase-7 log.json s05"}, {"title": "$0.99 cheaper state-filing price at the actual point of payment", "detail": "CK's $15/state vs FTU's $15.99/state is confirmed not just on the marketing landing page but at the literal checkout screen for both products.", "evidence": "ck-desktop phase-7 log.json s05; ftu-desktop phase-6 log.json s29"}], "ck_weaknesses": [{"title": "Dependent Care Credit stuck-loop with silent non-resolution", "detail": "A genuine correctness/transparency gap that survives Federal Review's own automated check \u2014 the single most severe finding against CK in this teardown.", "evidence": "ck-desktop phase-4 log.json s07-s10; phase-5 log.json s05"}, {"title": "W-2 'Needs review' full re-walk for one skipped conditional field", "detail": "One overlooked conditional textbox (FSA leftover amount) cost ~6-9 screens of blind re-confirmation with no jump-to-problem affordance and a non-specific error message.", "evidence": "ck-desktop phase-3 log.json s16-s19"}, {"title": "Conversational answer not propagating to the underlying CA tax form", "detail": "Caught only by a raw, unstyled Schedule CA(540NR) worksheet screen \u2014 a jarring UI departure and evidence of the same underlying-engine gap that caused the federal stuck-loop.", "evidence": "ck-desktop phase-6 log.json s17, s28-s29"}, {"title": "SSO friction between creditkarma.com and the actual filing engine", "detail": "A signed-in CK user is bounced through a full account-linking + sign-in prompt on accounts.intuit.com twice before reaching TurboTax.", "evidence": "ck-desktop phase-1 handoff.md; log.json s02-s03"}, {"title": "Pre-checked payment-method-storage consent checkbox", "detail": "Opt-out-by-inaction pattern on the live payment form at checkout.", "evidence": "ck-desktop phase-7 log.json s05"}, {"title": "Cart-removal control not reachable from the payment screen", "detail": "A filer must navigate back through the left-rail State section to find the real delete control for the state return.", "evidence": "ck-desktop phase-7 log.json s07, s10"}, {"title": "Mandatory two-step IRS 7216 consent gate reframed as a time-savings benefit", "detail": "The outer consent card visually implies mandatory sign-off (no visible Decline) though a genuine Decline exists one level deeper; the most consequential data-sharing text in either product is buried here, then reframed post-signing as 'save up to 12 minutes.'", "evidence": "ck-desktop phase-3 log.json s01, s03-s04"}, {"title": "Inconsistent 'No' label text across screeners", "detail": "At least four distinct phrasings for a negative answer appear across different screens in the same product.", "evidence": "ck-desktop phase-4/5 log.json notes"}], "ck_improvement_recommendations": [{"title": "Fix the Dependent Care Credit stuck-loop and make Federal Review actually catch it", "detail": "Compute and disclose the Form 2441 add-back for an unused dependent-care benefit the way FTU already does on the identical persona data, and ensure the Federal Review 'Check my info' pass surfaces (rather than silently ignores) any unresolved credit-eligibility item.", "effort_estimate": "Medium \u2014 likely a targeted fix to the credit-resolution logic plus a review-engine rule addition, not a redesign.", "impact": "High \u2014 closes the single most severe correctness/transparency finding in the whole teardown and removes a real risk of understated tax liability at scale."}, {"title": "Add a targeted 'jump to the problem' affordance on 'Needs review' summaries", "detail": "When a W-2 or credit item is flagged 'Needs review,' link directly to the specific unresolved field/question instead of forcing a full re-walk of the entire multi-screen sequence.", "effort_estimate": "Medium \u2014 requires tracking which sub-field triggered the flag and deep-linking to it.", "impact": "Medium-High \u2014 would have eliminated ~6-9 avoidable screens in this single traversal alone; compounds across every filer who hits any 'Needs review' state."}, {"title": "Fix the CA(540NR) conversational-answer-to-worksheet propagation gap", "detail": "Ensure the 'Did you earn all of your income in California?' (and equivalent) conversational answers actually populate the underlying Schedule CA(540NR) Column E allocation fields, so CA's Smart Check does not need to catch a blank raw-worksheet field after the fact.", "effort_estimate": "Medium \u2014 a data-binding/wiring fix between the conversational layer and the underlying TurboTax form, likely same root cause as the federal stuck-loop.", "impact": "High \u2014 this is the same class of bug appearing twice (federal and state); fixing the underlying propagation issue may resolve both at once."}, {"title": "Un-check the 'store payment method' consent checkbox by default", "detail": "Change the pre-checked payment-method-storage consent at checkout to unchecked-by-default, requiring an affirmative opt-in click.", "effort_estimate": "Low \u2014 a single default-value/UI change.", "impact": "Medium \u2014 meaningfully reduces dark-pattern-adjacent risk and associated trust/compliance exposure for a very small engineering cost."}, {"title": "Surface the state-return cart-removal control on the payment screen itself", "detail": "Add the existing 'Status of your state returns' trash-can delete control directly to the checkout/payment screen, mirroring FTU's directly-accessible 'Remove [State] Return' placement.", "effort_estimate": "Low \u2014 the control already exists elsewhere in the product; this is a placement/surfacing change.", "impact": "Medium \u2014 closes a documented, evidenced usability gap against a named competitor with minimal engineering lift."}, {"title": "Standardize 'No' answer label text across all screeners", "detail": "Consolidate the at-least-four distinct phrasings for negative answers ('No, I didn't' / 'No, they didn't' / plain 'No' / 'No, I don't want to') into one consistent pattern.", "effort_estimate": "Low \u2014 a copy/content standardization pass, no logic changes.", "impact": "Low \u2014 a minor but real polish improvement to internal consistency."}], "ftu_strengths": [{"title": "Correct, transparent handling of the dependent-care edge case", "detail": "Automatically added the $5,000 Box-10 benefit back to taxable income and later explicitly named/explained this add-back to the filer as a formal alert.", "evidence": "ftu-desktop phase-3 log.json s11; phase-7 log.json s10"}, {"title": "Directly accessible cart-removal control at checkout", "detail": "'Remove California State Return' sits on the same Order Products screen as the price, unlike CK's buried equivalent.", "evidence": "ftu-desktop phase-7 log.json s01-s03"}, {"title": "Genuinely instrument-free $0 federal path", "detail": "Once the paid state return is removed, no payment form of any kind is ever presented for the free federal filing \u2014 confirmed at the Order Summary screen showing TOTAL AMOUNT DUE $0.00 with no card fields.", "evidence": "ftu-desktop phase-7 log.json s05"}, {"title": "Proactive e-file eligibility pre-validation", "detail": "FTU blocks e-file up front when the test EIN is invalid-format, rather than letting a submission fail downstream at the IRS \u2014 user-protective behavior.", "evidence": "ftu-desktop phase-7 log.json s12"}, {"title": "Wyoming (no-income-tax states) never see the state paywall at all", "detail": "FTU explicitly declines to create a chargeable WY return once residency and no-other-state-income are confirmed \u2014 the state monetization moment is state-dependent and honestly gated.", "evidence": "ftu-desktop phase-6 log.json s05-s06"}, {"title": "Reached the literal filing completion edge", "detail": "FTU's traversal is the only one of the two to reach a true final 'Finish Tax Return' / attestation screen, giving the fullest possible S2C picture.", "evidence": "ftu-desktop phase-7 log.json s13"}, {"title": "Positive soft-validation pattern for invalid EIN and ZIP mismatches", "detail": "Non-blocking advisories that name the exact problem field and let a legitimate edge-case filer proceed rather than hard-blocking.", "evidence": "ftu-desktop phase-3 log.json s06; phase-2 log.json s01"}], "ftu_weaknesses": [{"title": "Mandatory SSN and DOB on the very first personal-info screen, no skip path", "detail": "9 required fields in one heavy form (heavy_form + sensitive_data_request flags), with no equivalent to CK's later, explicitly optional SSN screen.", "evidence": "ftu-desktop phase-2 log.json s01"}, {"title": "Four-plus separate paid-product exposures spread across the flow", "detail": "Deluxe $7.99, Pro Support $64.99 (three exposures), and Audit Defense $19.99 (two exposures, one AFTER the cart is already settled at $0) \u2014 a meaningfully more repetitive monetization pattern than CK's single consolidated checkout upsell.", "evidence": "ftu-desktop phase-2 s05, phase-4 s01, phase-5 s01, phase-7 s04"}, {"title": "Risky un-defaulted / mis-defaulted radios", "detail": "The 'Did you file a 2024 California tax return?' question defaulted to Yes for a first-time filer (had to be manually corrected); the College Tuition and Home Energy Credit screeners had no pre-selected default at all, forcing extra clicks.", "evidence": "ftu-desktop phase-6 log.json s12; phase-4 log.json s07, s12"}, {"title": "Aggressive post-removal retention and re-sell pattern", "detail": "Removing the CA state return triggers a save-the-sale dialog with questionable urgency copy ('you'll still need to file by April 15, 2026' for a $0-liability nonresident return), followed by four separate add-back nudges through the rest of Final Steps.", "evidence": "ftu-desktop phase-7 log.json s02-s03, s05, s10, s11"}, {"title": "Densest single-screen form in either product's traversal", "detail": "The W-2 entry screen carries ~13 required + ~40 optional fields on one page \u2014 a genuinely heavier single-screen cognitive load than any CK screen produced.", "evidence": "ftu-desktop phase-3 log.json s03"}, {"title": "Two consecutive, near-duplicate W-2 summary screens", "detail": "A minor structural redundancy (a list-style summary immediately followed by a compact summary of the same single W-2).", "evidence": "ftu-desktop phase-3 log.json s07-s08"}], "lowest_hanging_fruit": [{"title": "Fix the Dependent Care Credit 'Needs review' stuck-loop and surface it in Federal Review", "detail": "This is a confirmed, reproducible bug (answering the question truthfully never clears the flag) with a known FTU model to copy: explicitly compute and disclose the add-back, the way FTU already does for the identical scenario on the identical persona data.", "why_now": "This is CK's single most severe correctness/transparency finding in the whole teardown, has a working reference implementation already proven in a competitor on the exact same test data, and does not require new product surface area \u2014 just fixing the resolution logic and adding it to the existing Federal Review check."}, {"title": "Move the state-return cart-removal control onto the payment screen itself", "detail": "FTU already demonstrates the pattern (a 'Remove [State] Return' control directly on its Order Products/checkout screen); CK's equivalent control exists but only on a separate 'Status of your state returns' table reachable by navigating away from checkout.", "why_now": "The control already exists elsewhere in the product \u2014 this is a placement/surfacing fix, not new engineering, and directly closes a documented, evidenced usability gap against a named competitor."}, {"title": "Un-check the 'store payment method' consent checkbox by default", "detail": "Change the pre-checked payment-method-storage consent on the live payment form to unchecked-by-default (opt-in-by-action).", "why_now": "This is a single default-value change, directly evidenced as a dark-pattern-adjacent finding, and carries real trust/compliance risk if surfaced publicly or by a regulator; the fix is trivially small relative to its risk reduction."}], "reddit_trust_narrative": "A recurring theme in public sentiment around FreeTaxUSA is that its plain, form-literal, occasionally brutalist UI is itself a trust signal for power users and anyone who has ever prepared taxes on paper \u2014 the product feels like it IS the tax form, not a layer sitting on top of one. This traversal produced direct, concrete evidence for that narrative: FTU's screens consistently use literal IRS/FTB terminology and box numbers ('Box 10 Dependent Care', 'Box 12 code D/AA', 'Form 1098-T', 'Schedule CA') as their primary labels rather than translating them into friendlier conversational language, and its review/alerts system explicitly names and explains real tax-law mechanics to the filer (e.g. the dependent-care add-back). By contrast, CK/TurboTax's conversational chrome is polished and reassuring almost everywhere -- until the moment its own review engine has to catch a real problem, at which point the raw underlying tax-software engine surfaces without warning: CK's CA state-return review ('Smart Check' -- itself the actual, never-branded TurboTax engine name) produced two raw Schedule CA(540NR) worksheet screens, complete with literal field codes, standing in visual contrast to every other screen in the same product. For a filer who values feeling like they can see and verify the actual math and forms underneath the software (the FTU-power-user narrative), this is a meaningfully different experience: FTU shows its work throughout; CK only shows its work when something breaks.", "swot": {"ck": {"strengths": ["Profile-derived identity pre-fill (unique capability FTU cannot replicate)", "Softer, optional-framed SSN collection", "Zero upsells in two full phases (Personal Info, Deductions & Credits)", "Live always-visible tax-due tracker", "Cheaper state price at actual checkout ($15 vs $15.99)", "Single consolidated $29 checkout upsell rather than multiple separate ones"], "weaknesses": ["Dependent Care Credit stuck-loop with silent non-resolution surviving Federal Review", "W-2 'Needs review' full re-walk bug for one conditional field", "Conversational answers not propagating to the real CA tax form", "SSO friction between creditkarma.com and the actual filing engine", "Pre-checked payment-method-storage consent", "Buried cart-removal control", "Inconsistent label text across screeners"], "opportunities": ["Fix the two known stuck-loop/non-propagation bugs using FTU's already-proven correct-handling model on the identical test scenario", "Differentiate on CK-profile pre-fill as a headline consumer-facing feature ('start your taxes already half-done')", "Consolidate/streamline the checkout upsell pattern as a positive contrast to competitor a-la-carte fatigue", "Close the transparency gap by having Federal/State Review explicitly disclose known edge-case resolutions the way FTU's Tax Return Alerts do"], "threats": ["Public/regulatory scrutiny of the CK-is-really-TurboTax architecture and the pre-checked payment-storage consent as a dark-pattern-adjacent practice", "The stuck-loop and worksheet-propagation bugs are real correctness risks that could produce incorrect filed returns at scale if unresolved", "FTU's forthright form-literal styling appeals to a trust-conscious segment CK's smoothed-over conversational layer does not currently reach"]}, "ftu": {"strengths": ["Correct, transparent dependent-care edge-case handling with explicit filer-facing explanation", "Directly accessible cart-removal control at checkout", "Genuinely instrument-free free federal path", "Proactive e-file eligibility pre-validation", "Honest state-dependent paywall (no-income-tax states never charged)", "Reached the literal filing completion edge in this teardown", "Form-literal styling that builds trust with power users"], "weaknesses": ["Mandatory SSN+DOB with no skip path on the very first personal-info screen", "Four-plus separate paid-product exposures spread across the flow, including a post-checkout Audit Defense ambush after the cart is already settled at $0", "Risky un-defaulted radio on the 2024-CA-return question (defaulted Yes for a first-time filer)", "Aggressive four-nudge chase of a removed state return, plus a retention dialog with dubious 'must file by 4/15' urgency copy for a $0-liability return", "Densest single-screen W-2 form in either product (~13 required + ~40 optional fields on one page)"], "opportunities": ["Consolidate the four-plus separate paid-product touchpoints into fewer, clearer moments to reduce perceived nagging while likely preserving conversion", "Soften or remove the questionable retention-dialog urgency copy to protect trust with price-sensitive/power users who are FTU's core differentiator", "Fix the un-defaulted-radio pattern (College, Home Energy, 2024-CA-return screens) for a small but real friction reduction"], "threats": ["CK's cheaper state price ($15 vs $15.99) and consolidated single-upsell checkout could pull price-sensitive filers who are otherwise FTU's core base", "Repeated post-decline monetization nudges risk eroding the trust/no-nonsense reputation that is FTU's main competitive asset", "No mobile traversal exists yet to confirm FTU's experience holds up outside desktop, where its dense single-page forms may translate worse to a small screen"]}}, "pain_points_ftu_ignores": [{"title": "Very high field density on the single W-2 screen", "detail": "FTU's ~13 required + ~40 optional fields on one page is the single heaviest screen in either product's traversal \u2014 an opportunity for CK to differentiate on a genuinely lighter-feeling (if more multi-step) W-2 entry experience, provided CK first fixes its own stuck-loop bug."}, {"title": "Repeated, spread-out paid-product exposure fatigue", "detail": "FTU surfaces four-plus distinct paid products across the flow, including a post-checkout ambush after the cart is already at $0 \u2014 CK's single consolidated checkout upsell is a genuinely less naggy pattern CK could lean into and market directly against FTU's approach."}, {"title": "Retention-dialog urgency copy of questionable accuracy", "detail": "FTU's 'you'll still need to file your CA return by April 15, 2026' claim on cart-removal is presented as fact for a filer whose $0-liability nonresident return likely isn't required at all \u2014 a trust-risk CK could publicly and credibly avoid by contrast if CK's own equivalent messaging (untested in this traversal) is more accurate."}], "three_point_executive_summary": ["The S2C Reality: Both products get a single-W-2 Wyoming filer with a CA-employer nonresident wrinkle to the exact same computed outcome ($512 federal due, $0 CA state tax) via meaningfully different journeys -- CK logs more total screens (96 vs 83) largely due to two structural bugs (a W-2 review stuck-loop and a CA worksheet-propagation gap), while FTU logs more required fields (86 vs 74) by concentrating data entry onto fewer, denser screens; neither pattern is simply better, but CK's screen-count driver is partly a real product defect FTU does not share.", "The Monetization Gap: CK is $0.99 cheaper per state at actual checkout and consolidates its upsell into a single $29 bundle shown once; FTU is more expensive per state and spreads four-plus paid-product exposures across the funnel (including a post-checkout Audit Defense ambush), but FTU's cart-removal is directly accessible at checkout while CK's is buried, and FTU alone reaches a genuinely instrument-free $0 free-tier completion path with a proactive e-file-eligibility check CK's traversal did not surface an equivalent for.", "The Core Opportunity: CK's most urgent, highest-leverage fix is not a new feature but a correctness bug -- the Dependent Care Credit stuck-loop and its CA-worksheet twin both leave a real tax-treatment question silently unresolved even after passing CK's own automated review, while FTU already demonstrates the correct, transparent handling of the identical edge case on the identical test data; closing this gap, and secondarily surfacing the cart-removal control at checkout the way FTU already does, would resolve CK's two most severe, most evidence-backed weaknesses using an already-proven competitor blueprint."]};
+
+/* Screenshot metadata: maps curated keys to captions + which product/phase they evidence */
+const SHOTS = {
+  ck: [
+    {key:'ck-01-tax-hub-turbotax', title:'"Powered by TurboTax"', cap:'CK’s own Tax hub discloses the underlying engine outright before the redirect to us-west-2.turbotaxonline.intuit.com.'},
+    {key:'ck-02-prefill', title:'Profile-derived pre-fill', cap:'Jumpstart screen offers Name/DOB pulled from the existing Credit Karma profile — FTU has no prior relationship to draw from.'},
+    {key:'ck-03-ssn-optional', title:'SSN deferred, marked optional', cap:'"Skip for now" framing, pitched as unlocking tax credits — softer than a mandatory first-screen ask.'},
+    {key:'ck-04-7216-consent', title:'IRS §7216 consent (step 2)', cap:'The most consequential data-sharing disclosure in either product: SSN/income sharing with Intuit’s foreign affiliates, up to 5 years.'},
+    {key:'ck-05-w2-needs-review', title:'W-2 "Needs review"', cap:'Every visible field is filled, yet the summary still flags Needs review — the actual cause is a hidden conditional field.'},
+    {key:'ck-06-dependent-care-needs-review', title:'Dependent Care Credit stuck', cap:'"Daycare receipts — Needs review" surfaces here for the first time, next to a fully-resolved Standard Deduction line.'},
+    {key:'ck-07-stuck-loop-confirmed', title:'Loop confirmed', cap:'Re-entering the review shows the identical question, already answered “No” — no new information, no path to resolution.'},
+    {key:'ck-08-federal-review-clean', title:'False-clean Federal Review', cap:'"You’re getting every tax break you deserve... Your details look complete" — zero mention of the unresolved item above.'},
+    {key:'ck-09-ca-nonresident-question', title:'The CA allocation question', cap:'"Did you earn all of your income in California?" — answered No, but this answer silently fails to reach the real tax form.'},
+    {key:'ck-10-raw-worksheet', title:'Raw Schedule CA(540NR)', cap:'CK’s conversational chrome vanishes: a literal field-code worksheet appears, the underlying TurboTax engine surfacing unstyled.'},
+    {key:'ck-11-smart-check-clean', title:'"Smart Check Results"', cap:'The actual (never-branded) TurboTax review-engine name, caught in the act of fixing what Federal Review missed.'},
+    {key:'ck-12-paywall', title:'The paywall', cap:'Federal $0 + CA $15 = $15, live card form, and a pre-checked "store payment method" consent — all on one screen.'},
+    {key:'ck-13-buried-delete', title:'Buried cart-removal', cap:'A real delete icon exists — just not on the payment screen. Reachable only via State → Status of your state returns.'}
+  ],
+  ftu: [
+    {key:'ftu-01-landing-pricing', title:'Pricing disclosed up front', cap:'Federal $0 / State $15.99 / Deluxe $7.99 / Pro Support $64.99 / Audit Defense $19.99 — all visible before login.'},
+    {key:'ftu-02-ssn-mandatory-s1', title:'SSN mandatory, screen one', cap:'9 required fields including SSN and DOB, no skip path — heavier and more sensitive than CK’s equivalent moment.'},
+    {key:'ftu-03-deluxe-upsell', title:'Deluxe $7.99 interstitial', cap:'Full-screen upsell immediately after the personal-info summary, before Income begins.'},
+    {key:'ftu-04-w2-dense-form', title:'The single-screen W-2', cap:'~13 required + ~40 optional fields on one page — the single heaviest screen either product produced.'},
+    {key:'ftu-05-income-addback-correct', title:'Dependent-care handled correctly', cap:'The $5,000 Box-10 benefit is automatically added back to taxable income: $48,062 → $53,062. No stuck loop.'},
+    {key:'ftu-06-pro-support-upsell', title:'Pro Support $64.99', cap:'Full-screen interstitial gates the Income→Deductions transition — the second paid offer of the traversal.'},
+    {key:'ftu-07-federal-summary', title:'Federal Tax Summary', cap:'Full itemized computed return with a downloadable PDF — no "clean bill of health" messaging layer in between.'},
+    {key:'ftu-08-paywall-1599', title:'Order Products: $15.99', cap:'Federal FREE + CA $15.99, with an explicit "Remove California State Return" control on the same screen as the price.'},
+    {key:'ftu-09-retention-dialog', title:'Retention dialog on removal', cap:'"You’ll still need to file by April 15, 2026" — dubious urgency for a return with $0 computed liability.'},
+    {key:'ftu-10-audit-defense-postcheckout', title:'Audit Defense, post-checkout', cap:'A dedicated $19.99 interstitial fires even after the cart has already settled at $0.'},
+    {key:'ftu-11-alerts-transparency', title:'Tax Return Alerts', cap:'The dependent-care add-back is explicitly named and explained to the filer — a real transparency advantage.'},
+    {key:'ftu-12-efile-blocked', title:'E-file blocked proactively', cap:'Invalid test EIN caught before submission, routing to a mail-in path rather than failing downstream at the IRS.'},
+    {key:'ftu-13-terminal', title:'The terminal screen', cap:'"Finish Tax Return" — the literal completion edge, captured and never clicked. The deepest point either traversal reached.'}
+  ]
+};
+
+/* ======================= UTIL ======================= */
+function el(tag, cls, html){ const e=document.createElement(tag); if(cls) e.className=cls; if(html!==undefined) e.innerHTML=html; return e; }
+function esc(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function sevBadge(sev){ return `<span class="badge badge-${sev}">${sev}</span>`; }
+function prodBadge(p){
+  if(p==='ck') return '<span class="badge badge-ck">CK Tax</span>';
+  if(p==='ftu') return '<span class="badge badge-ftu">FreeTaxUSA</span>';
+  return '<span class="badge badge-both">Both</span>';
+}
+
+function openLightbox(key, title, cap){
+  document.getElementById('lightboxImg').src = img(key);
+  document.getElementById('lightboxImg').alt = title;
+  document.getElementById('lightboxCap').innerHTML = `<b>${esc(title)}</b><br>${esc(cap||'')}`;
+  document.getElementById('lightbox').classList.add('open');
+}
+function closeLightbox(){ document.getElementById('lightbox').classList.remove('open'); }
+document.getElementById('lightboxClose').addEventListener('click', closeLightbox);
+document.getElementById('lightbox').addEventListener('click', e=>{ if(e.target.id==='lightbox') closeLightbox(); });
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeLightbox(); });
+
+/* Delegated click handler: any element with data-lightbox-key opens the lightbox.
+   Avoids inline onclick="" string-building, which breaks when captions contain quotes. */
+document.addEventListener('click', (e)=>{
+  const t = e.target.closest('[data-lightbox-key]');
+  if(!t) return;
+  openLightbox(t.dataset.lightboxKey, t.dataset.lightboxTitle||'', t.dataset.lightboxCap||'');
+});
+
+function shotImgTag(key, title, cap, extraClass){
+  return `<img class="${extraClass||'journey-shot'}" src="${img(key)}" alt="${esc(title)}"
+    data-lightbox-key="${esc(key)}" data-lightbox-title="${esc(title)}" data-lightbox-cap="${esc(cap)}">`;
+}
+
+/* ======================= PERSONA STRIP ======================= */
+(function(){
+  const p = DATA.persona;
+  const s = document.getElementById('personaStrip');
+  s.innerHTML = `
+    <span><b>Filer</b> ${esc(p.filer_name)}, ${esc(p.filing_status)}</span>
+    <span><b>Resident state</b> Wyoming (no income tax)</span>
+    <span><b>Employer</b> Goods Inc (CA-headquartered)</span>
+    <span><b>W-2 wages</b> $${p.w2_wages_box1.toLocaleString()}</span>
+    <span><b>Edge case</b> $5,000 dependent-care benefit, zero dependents</span>
+    <span><b>Computed outcome (both)</b> Fed due $512 &middot; CA tax $0</span>
+  `;
+})();
+
+/* ======================= TAB SWITCHING ======================= */
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('panel-'+btn.dataset.tab).classList.add('active');
+    window.scrollTo({top:0, behavior:'instant'});
+  });
+});
+
+/* ======================= BUILD: PRODUCT TAB (FTU / CK) ======================= */
+function buildProductTab(panelId, product){
+  const panel = document.getElementById(panelId);
+  const isCk = product==='ck';
+  const accent = isCk ? 'ck' : 'ftu';
+  const m = DATA.metrics[product];
+  const shots = SHOTS[product];
+
+  let html = '';
+
+  // Hero
+  html += `<div class="product-hero">
+    <div>
+      <span class="eyebrow" style="color:var(--${accent})">${isCk?'Credit Karma Tax':'FreeTaxUSA'}</span>
+      <h1>${isCk?'CK Tax':'FreeTaxUSA'}</h1>
+      <div class="tag">${isCk
+        ? 'CK-branded chrome over TurboTax Online’s actual filing engine, reached via an SSO handoff from creditkarma.com.'
+        : 'A single-domain, form-literal filing product that mirrors the structure of the paper 1040 throughout.'}</div>
+    </div>
+    <div class="stat-row">
+      <div class="stat"><div class="num">${m.total_screens}</div><div class="lbl">Screens</div></div>
+      <div class="stat"><div class="num">${m.total_clicks}</div><div class="lbl">Clicks</div></div>
+      <div class="stat"><div class="num">${m.total_required_fields}</div><div class="lbl">Required fields</div></div>
+      <div class="stat"><div class="num">${m.upsell_count}</div><div class="lbl">Upsell exposures</div></div>
+    </div>
+  </div>`;
+
+  // Phase-by-phase journey with screenshots woven in as a flow
+  html += `<div class="section"><div class="section-head"><h2>The journey, phase by phase</h2></div>
+  <div class="section-desc">Every phase of the traversal, in order, with the key moment worth remembering from each — illustrated where a screenshot was captured.</div>
+  <div style="margin-top:20px;" class="journey">`;
+
+  const shotByPhaseHint = {}; // crude mapping: distribute shots across phases in order
+  m.phases.forEach((ph, i)=>{
+    html += `<div class="card" style="margin-bottom:14px;">
+      <div class="journey-stage-label">Phase ${ph.phase} &middot; ${ph.screens} screens &middot; ${ph.upsells} upsell${ph.upsells===1?'':'s'}</div>
+      <h3 style="font-size:16px; margin-bottom:6px;">${esc(ph.name)}</h3>
+      <div style="font-size:13px; color:var(--ink-soft); max-width:78ch;">${esc(ph.key_moment)}</div>
+    </div>`;
+    if(i < m.phases.length-1){
+      html += `<div class="journey-vert-connector"></div>`;
+    }
+  });
+  html += `</div></div>`;
+
+  // Screenshot gallery for this product
+  html += `<div class="section"><div class="section-head"><h2>Evidence gallery</h2></div>
+  <div class="section-desc">Click any screen to enlarge. Selected from the full ${m.total_screens}-screen log as the moments that matter most.</div>
+  <div class="shot-grid" style="margin-top:16px;">`;
+  shots.forEach(s=>{
+    html += `<div class="shot-card" data-lightbox-key="${esc(s.key)}" data-lightbox-title="${esc(s.title)}" data-lightbox-cap="${esc(s.cap)}">
+      <img src="${img(s.key)}" alt="${esc(s.title)}">
+      <div class="cap"><b>${esc(s.title)}</b>${esc(s.cap)}</div>
+    </div>`;
+  });
+  html += `</div></div>`;
+
+  // Strengths / weaknesses
+  const strengths = DATA[product+'_strengths'];
+  const weaknesses = DATA[product+'_weaknesses'];
+  html += `<div class="section"><div class="section-head"><h2>What ${isCk?'CK Tax':'FreeTaxUSA'} does well</h2></div>
+    <div class="card"><ul class="sw-list">`;
+  strengths.forEach(x=>{
+    html += `<li><b>${esc(x.title)}</b><div class="detail">${esc(x.detail)}</div><div class="ev">${esc(x.evidence)}</div></li>`;
+  });
+  html += `</ul></div></div>`;
+
+  html += `<div class="section"><div class="section-head"><h2>Where it falls short</h2></div>
+    <div class="card"><ul class="sw-list weak">`;
+  weaknesses.forEach(x=>{
+    html += `<li><b>${esc(x.title)}</b><div class="detail">${esc(x.detail)}</div><div class="ev">${esc(x.evidence)}</div></li>`;
+  });
+  html += `</ul></div></div>`;
+
+  if(isCk){
+    html += `<div class="section"><div class="section-head"><h2>Recommended fixes</h2></div>
+      <div class="card">`;
+    DATA.ck_improvement_recommendations.forEach((r,i)=>{
+      html += `<div style="padding:12px 0; ${i>0?'border-top:1px solid var(--line-soft);':''}">
+        <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+          <b style="font-size:13.5px;">${esc(r.title)}</b>
+          <span class="mono" style="font-size:10.5px; color:var(--neutral);">Effort: ${esc(r.effort_estimate.split(' —')[0])}</span>
+        </div>
+        <div style="font-size:12.8px; color:var(--ink-soft); margin-top:4px;">${esc(r.detail)}</div>
+        <div style="font-size:11.5px; color:var(--good); margin-top:4px;"><b>Impact:</b> ${esc(r.impact)}</div>
+      </div>`;
+    });
+    html += `</div></div>`;
+  }
+
+  panel.innerHTML = html;
+}
+
+/* ======================= BUILD: ANALYSIS TAB ======================= */
+function buildAnalysisTab(){
+  const panel = document.getElementById('panel-analysis');
+  let html = '';
+
+  // 3-point exec summary
+  const summaryTitles = ['The S2C Reality', 'The Monetization Gap', 'The Core Opportunity'];
+  html += `<div class="section">
+    <div class="section-head"><h2>Executive summary</h2></div>
+    <div class="exec-strip">`;
+  DATA.three_point_executive_summary.forEach((txt, i)=>{
+    const parts = txt.split(/:\s*/);
+    const body = parts.slice(1).join(': ');
+    html += `<div class="exec-card">
+      <div class="exec-num">0${i+1}</div>
+      <h3>${esc(summaryTitles[i])}</h3>
+      <p>${esc(body)}</p>
+    </div>`;
+  });
+  html += `</div></div>`;
+
+  // S2C stage-by-stage comparison chart (screens)
+  const td = DATA.tedium_comparison.chart_data;
+  const maxScreens = Math.max(...td.ck_screens, ...td.ftu_screens);
+  html += `<div class="section">
+    <div class="section-head"><h2>S2C journey: screens per stage</h2></div>
+    <div class="section-desc">${esc(DATA.tedium_comparison.narrative)}</div>
+    <div class="card" style="margin-top:16px;">
+      <div class="legend">
+        <span><span class="legend-swatch" style="background:var(--ck)"></span>CK Tax (${DATA.metrics.ck.total_screens} total)</span>
+        <span><span class="legend-swatch" style="background:var(--ftu)"></span>FreeTaxUSA (${DATA.metrics.ftu.total_screens} total)</span>
+      </div>
+      <div class="chart-wrap"><svg id="tedium-chart" width="100%" viewBox="0 0 920 300" style="min-width:640px;"></svg></div>
+    </div>
+  </div>`;
+
+  // S2C stage-by-stage table (the requested step comparison: auth/general/federal/state/review/submit)
+  html += `<div class="section">
+    <div class="section-head"><h2>Stage-by-stage: CK Tax vs FreeTaxUSA</h2></div>
+    <div class="section-desc">Every major S2C stage, side by side — what happens, and the friction or advantage specific to each product.</div>
+    <div style="margin-top:18px;">`;
+  DATA.s2c_journey_steps.forEach(step=>{
+    html += `<div class="card" style="margin-bottom:14px;">
+      <div class="eyebrow" style="margin-bottom:10px;">${esc(step.stage)}</div>
+      <div class="grid-2">
+        <div style="border-right:1px solid var(--line-soft); padding-right:16px;">
+          <div class="badge badge-ftu" style="margin-bottom:8px;">FreeTaxUSA &middot; ${step.ftu.screen_count} screens</div>
+          <div style="font-size:13px; margin-bottom:6px;">${esc(step.ftu.summary)}</div>
+          <div style="font-size:11.5px; color:var(--ink-soft);"><b>Friction/notes:</b> ${esc(step.ftu.friction_notes)}</div>
+        </div>
+        <div style="padding-left:0;">
+          <div class="badge badge-ck" style="margin-bottom:8px;">CK Tax &middot; ${step.ck.screen_count} screens</div>
+          <div style="font-size:13px; margin-bottom:6px;">${esc(step.ck.summary)}</div>
+          <div style="font-size:11.5px; color:var(--ink-soft);"><b>Friction/notes:</b> ${esc(step.ck.friction_notes)}</div>
+        </div>
+      </div>
+    </div>`;
+  });
+  html += `</div></div>`;
+
+  // Guidance / jargon translation
+  html += `<div class="section">
+    <div class="section-head"><h2>Guidance quality: jargon translation</h2></div>
+    <div class="section-desc">How each product explains the moments most likely to confuse a filer.</div>
+    <div style="margin-top:16px;">`;
+  DATA.guidance_comparison.jargon_examples.forEach(j=>{
+    html += `<div class="card" style="margin-bottom:12px;">
+      <b style="font-size:13.5px;">${esc(j.concept)}</b>
+      <div class="grid-2" style="margin-top:10px;">
+        <div><div class="badge badge-ck" style="margin-bottom:6px;">CK Tax</div><div style="font-size:12.8px; color:var(--ink-soft);">${esc(j.ck_handling)}</div></div>
+        <div><div class="badge badge-ftu" style="margin-bottom:6px;">FreeTaxUSA</div><div style="font-size:12.8px; color:var(--ink-soft);">${esc(j.ftu_handling)}</div></div>
+      </div>
+    </div>`;
+  });
+  html += `<div class="card" style="background:var(--neutral-soft); border-style:dashed;">
+    <span class="eyebrow">Evidence gap</span>
+    <div style="font-size:12.5px; color:var(--ink-soft); margin-top:6px;">${esc(DATA.guidance_comparison.qa_style_notes.evidence_gap)}</div>
+  </div>`;
+  html += `</div></div>`;
+
+  // Reddit trust narrative
+  html += `<div class="section">
+    <div class="section-head"><h2>Where FTU is beating us: the trust narrative</h2></div>
+    <div class="card" style="border-left:3px solid var(--ftu);">
+      <div style="font-size:13.5px; line-height:1.65;">${esc(DATA.reddit_trust_narrative)}</div>
+    </div>
+  </div>`;
+
+  // Data entry comparison
+  const de = DATA.data_entry_comparison;
+  html += `<div class="section">
+    <div class="section-head"><h2>Data entry: W-2 import vs. typing it in</h2></div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="badge badge-ftu" style="margin-bottom:8px;">FreeTaxUSA</div>
+        <div style="font-size:13px; color:var(--ink-soft);">${esc(de.w2_entry.ftu_approach)}</div>
+      </div>
+      <div class="card">
+        <div class="badge badge-ck" style="margin-bottom:8px;">CK Tax</div>
+        <div style="font-size:13px; color:var(--ink-soft);">${esc(de.w2_entry.ck_approach)}</div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:12px; background:var(--ck-soft); border-color:var(--ck);">
+      <b style="font-size:13px;">Pre-fill differentiator</b>
+      <div style="font-size:12.8px; margin-top:4px;">${esc(de.w2_entry.pre_fill_differentiator)}</div>
+    </div>
+    <div class="card" style="margin-top:12px; border-style:dashed; background:var(--neutral-soft);">
+      <span class="eyebrow">Gap &middot; not yet tested</span>
+      <div style="font-size:12.5px; color:var(--ink-soft); margin-top:6px;">${esc(de.mobile_first_claims.status)}</div>
+    </div>
+  </div>`;
+
+  // MONETIZATION section
+  const mo = DATA.monetization_comparison;
+  html += `<div class="section">
+    <div class="section-head"><h2>Monetization &amp; value extraction</h2></div>
+    <div class="section-desc">How each product turns a free federal return into revenue, without tanking S2C completion.</div>
+    <div class="grid-2" style="margin-top:16px;">
+      <div class="card">
+        <div class="badge badge-ck" style="margin-bottom:10px;">CK Tax pricing</div>
+        <table class="data">
+          <tr><td>Federal</td><td class="price">${esc(mo.ck_pricing.federal.split(' (')[0])}</td></tr>
+          <tr><td>State (CA)</td><td class="price">${esc(mo.ck_pricing.state)}</td></tr>
+          <tr><td>Checkout subtotal</td><td class="price">${esc(mo.ck_pricing.checkout_subtotal)}</td></tr>
+          <tr><td>PLUS bundle</td><td class="price">$29</td></tr>
+        </table>
+        <div style="font-size:12px; color:var(--ink-soft); margin-top:10px;">${esc(mo.ck_pricing.plus_bundle_upsell)}</div>
+      </div>
+      <div class="card">
+        <div class="badge badge-ftu" style="margin-bottom:10px;">FreeTaxUSA pricing</div>
+        <table class="data">
+          <tr><td>Federal</td><td class="price">Free</td></tr>
+          <tr><td>State (CA)</td><td class="price">$15.99</td></tr>
+          <tr><td>Checkout subtotal</td><td class="price">${esc(mo.ftu_pricing.checkout_subtotal)}</td></tr>
+          <tr><td>A-la-carte add-ons</td><td class="price">4 distinct</td></tr>
+        </table>
+        <div style="font-size:12px; color:var(--ink-soft); margin-top:10px;">${esc(mo.ftu_pricing.a_la_carte_upsells)}</div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:12px;">
+      <b style="font-size:13.5px;">Upsell placement strategy</b>
+      <div style="font-size:13px; color:var(--ink-soft); margin-top:6px;">${esc(mo.upsell_placement_diff)}</div>
+    </div>
+    <div class="card" style="margin-top:12px;">
+      <b style="font-size:13.5px;">The state handoff</b>
+      <div style="font-size:13px; color:var(--ink-soft); margin-top:6px;">${esc(mo.state_handoff_findings)}</div>
+    </div>
+    <div class="grid-2" style="margin-top:12px;">
+      <div class="card">
+        <b style="font-size:13px;">Cart-removal mechanics</b>
+        <div style="font-size:12.5px; color:var(--ink-soft); margin-top:6px;">${esc(mo.cart_removal_mechanics)}</div>
+      </div>
+      <div class="card" style="border-color:var(--risk);">
+        <b style="font-size:13px; color:var(--risk);">Payment-method defaults</b>
+        <div style="font-size:12.5px; color:var(--ink-soft); margin-top:6px;">${esc(mo.payment_method_defaults)}</div>
+      </div>
+    </div>
+
+    <div style="margin-top:20px;">
+      <h3 style="font-size:15px; margin-bottom:10px;">Paywall, side by side</h3>
+      <div class="grid-2">
+        <div class="card">
+          ${shotImgTag('ftu-08-paywall-1599','FTU Order Products','Federal FREE + CA $15.99 = $15.99, with Remove control on-screen.','journey-shot')}
+          <div class="journey-caption">FreeTaxUSA &middot; <span class="journey-price">$15.99</span> total, cart-removal directly accessible.</div>
+        </div>
+        <div class="card">
+          ${shotImgTag('ck-12-paywall','CK Tax paywall','Federal $0 + CA $15 = $15, live card form + PLUS $29 bundle on the same screen.','journey-shot')}
+          <div class="journey-caption">CK Tax &middot; <span class="journey-price">$15.00</span> total, payment form and PLUS upsell on the same screen.</div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+
+  // Headline findings
+  html += `<div class="section">
+    <div class="section-head"><h2>Headline findings</h2></div>
+    <div class="section-desc">Ranked by severity across the whole teardown. Every claim traces to a specific screen.</div>
+    <div class="card" style="margin-top:16px;">`;
+  DATA.headline_findings.forEach(f=>{
+    html += `<div class="finding">
+      <div class="finding-rank">${f.rank}</div>
+      <div class="finding-body">
+        <div class="finding-meta">${prodBadge(f.product)}${sevBadge(f.severity)}</div>
+        <div class="finding-title">${esc(f.title)}</div>
+        <div class="finding-summary">${esc(f.summary)}</div>
+        <div class="finding-evidence">${esc(f.evidence_source)}</div>
+      </div>
+    </div>`;
+  });
+  html += `</div></div>`;
+
+  // Lowest hanging fruit
+  html += `<div class="section">
+    <div class="section-head"><h2>Lowest-hanging fruit</h2></div>
+    <div class="section-desc">2-3 specific moments of friction FTU handles better, fixable next sprint.</div>
+    <div class="grid-3" style="margin-top:16px;">`;
+  DATA.lowest_hanging_fruit.forEach((f,i)=>{
+    html += `<div class="card" style="border-top:3px solid var(--ck);">
+      <div class="eyebrow" style="margin-bottom:8px;">Fix ${i+1}</div>
+      <b style="font-size:14px;">${esc(f.title)}</b>
+      <div style="font-size:12.5px; color:var(--ink-soft); margin-top:6px;">${esc(f.detail)}</div>
+      <div style="font-size:11.5px; color:var(--good); margin-top:8px;">${esc(f.why_now)}</div>
+    </div>`;
+  });
+  html += `</div></div>`;
+
+  // Pain points FTU ignores
+  html += `<div class="section">
+    <div class="section-head"><h2>Pain points FTU is ignoring — that we could own</h2></div>
+    <div class="card" style="margin-top:16px;">`;
+  DATA.pain_points_ftu_ignores.forEach((p,i)=>{
+    html += `<div style="padding:12px 0; ${i>0?'border-top:1px solid var(--line-soft);':''}">
+      <b style="font-size:13.5px;">${esc(p.title)}</b>
+      <div style="font-size:12.8px; color:var(--ink-soft); margin-top:4px;">${esc(p.detail)}</div>
+    </div>`;
+  });
+  html += `</div></div>`;
+
+  // SWOT
+  html += `<div class="section">
+    <div class="section-head"><h2>SWOT</h2></div>
+    <div class="grid-2" style="gap:24px;">
+      <div>
+        <div class="badge badge-ck" style="margin-bottom:10px;">CK Tax</div>
+        <div class="swot-grid">
+          <div class="swot-cell swot-s"><h4>Strengths</h4><ul>${DATA.swot.ck.strengths.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>
+          <div class="swot-cell swot-w"><h4>Weaknesses</h4><ul>${DATA.swot.ck.weaknesses.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>
+          <div class="swot-cell swot-o"><h4>Opportunities</h4><ul>${DATA.swot.ck.opportunities.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>
+          <div class="swot-cell swot-t"><h4>Threats</h4><ul>${DATA.swot.ck.threats.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>
+        </div>
+      </div>
+      <div>
+        <div class="badge badge-ftu" style="margin-bottom:10px;">FreeTaxUSA</div>
+        <div class="swot-grid">
+          <div class="swot-cell swot-s"><h4>Strengths</h4><ul>${DATA.swot.ftu.strengths.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>
+          <div class="swot-cell swot-w"><h4>Weaknesses</h4><ul>${DATA.swot.ftu.weaknesses.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>
+          <div class="swot-cell swot-o"><h4>Opportunities</h4><ul>${DATA.swot.ftu.opportunities.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>
+          <div class="swot-cell swot-t"><h4>Threats</h4><ul>${DATA.swot.ftu.threats.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+
+  // Gaps / what's next
+  html += `<div class="section">
+    <div class="section-head"><h2>Gaps &amp; what's next</h2></div>
+    <div class="card" style="border-style:dashed; background:var(--neutral-soft);">
+      <ul style="margin:0; padding-left:20px; font-size:13px; color:var(--ink-soft);">
+        <li>No mobile traversal exists yet for either product — mobile-first claims are unverified.</li>
+        <li>FTU's payment-method-storage default was never observed (its state return was removed before reaching a live payment form).</li>
+        <li>FTU's jargon/help-text depth wasn't independently probed beyond on-screen labels.</li>
+        <li>CK's traversal didn't test whether CK would refuse a Wyoming state return the way FTU explicitly does.</li>
+        <li>CK never reached a distinct final e-signature/submit control — the payment screen was its deepest point.</li>
+      </ul>
+    </div>
+  </div>`;
+
+  panel.innerHTML = html;
+  drawTedimChart();
+}
+
+function drawTedimChart(){
+  const svg = document.getElementById('tedium-chart');
+  const td = DATA.tedium_comparison.chart_data;
+  const W=920, H=300, padL=40, padR=20, padT=20, padB=54;
+  const plotW = W-padL-padR, plotH = H-padT-padB;
+  const n = td.phases.length;
+  const groupW = plotW/n;
+  const barW = groupW*0.32;
+  const maxVal = Math.max(...td.ck_screens, ...td.ftu_screens);
+  const niceMax = Math.ceil(maxVal/5)*5;
+
+  let s = '';
+  // gridlines + y labels
+  const ticks = 5;
+  for(let t=0;t<=ticks;t++){
+    const v = niceMax*t/ticks;
+    const y = padT + plotH - (v/niceMax)*plotH;
+    s += `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="var(--line-soft)" stroke-width="1"/>`;
+    s += `<text x="${padL-8}" y="${y+4}" text-anchor="end" font-family="var(--font-mono)" font-size="10.5" fill="var(--ink-soft)">${Math.round(v)}</text>`;
+  }
+  // bars
+  td.phases.forEach((ph,i)=>{
+    const gx = padL + i*groupW;
+    const ckV = td.ck_screens[i], ftuV = td.ftu_screens[i];
+    const ckH = (ckV/niceMax)*plotH, ftuH = (ftuV/niceMax)*plotH;
+    const x1 = gx + groupW*0.5 - barW - 3;
+    const x2 = gx + groupW*0.5 + 3;
+    s += `<rect x="${x1}" y="${padT+plotH-ftuH}" width="${barW}" height="${ftuH}" fill="var(--ftu)" rx="2"/>`;
+    s += `<text x="${x1+barW/2}" y="${padT+plotH-ftuH-6}" text-anchor="middle" font-family="var(--font-mono)" font-size="11" font-weight="600" fill="var(--ftu-ink)">${ftuV}</text>`;
+    s += `<rect x="${x2}" y="${padT+plotH-ckH}" width="${barW}" height="${ckH}" fill="var(--ck)" rx="2"/>`;
+    s += `<text x="${x2+barW/2}" y="${padT+plotH-ckH-6}" text-anchor="middle" font-family="var(--font-mono)" font-size="11" font-weight="600" fill="var(--ck-ink)">${ckV}</text>`;
+    // x label
+    s += `<text x="${gx+groupW/2}" y="${H-padB+18}" text-anchor="middle" font-family="var(--font-body)" font-size="11" fill="var(--ink-soft)">${ph.replace('P'+(i+1)+' ','')}</text>`;
+    s += `<text x="${gx+groupW/2}" y="${H-padB+32}" text-anchor="middle" font-family="var(--font-mono)" font-size="9.5" fill="var(--neutral)">Phase ${i+1}</text>`;
+  });
+  s += `<line x1="${padL}" y1="${padT+plotH}" x2="${W-padR}" y2="${padT+plotH}" stroke="var(--line)" stroke-width="1.5"/>`;
+  svg.innerHTML = s;
+}
+
+/* ======================= INIT ======================= */
+buildAnalysisTab();
+buildProductTab('panel-ftu', 'ftu');
+buildProductTab('panel-ck', 'ck');
+</script>
+</body>
+</html>
