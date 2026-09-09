@@ -684,10 +684,10 @@ function buildAnalysisTab(){
       <div class="tldr-block">
         <h3>Recommendations &amp; next steps</h3>
         <ul class="tldr-reco">
-          <li>
+          <li class="tldr-reco-new">
             <div class="tldr-reco-num">1</div>
-            <div class="tldr-reco-body"><b>Fix the Dependent Care Credit stuck-loop</b>
-              <div class="detail">Compute &amp; disclose the Form 2441 add-back the way FTU already does on our own test persona, and make Federal Review actually catch it. Medium effort, highest-severity fix in the teardown.</div>
+            <div class="tldr-reco-body"><b>Turn "start your taxes" into "review your taxes"<span class="tag-new">New</span></b>
+              <div class="detail">CK already pre-fills Name/DOB from the Credit Karma profile &mdash; a completion advantage FTU structurally cannot copy, since it has no relationship with a new filer. We only use it narrowly today. The single biggest completion-killer we measured is the Income/W-2 phase (CK's largest bloated section, ~22&ndash;28 screens of typing boxes off a paper form). If CK can responsibly draft income/employer data from signals already in the user's Credit Karma accounts (linked bank/direct-deposit, existing employer records) and hand the filer a pre-filled return to confirm rather than a blank W-2 to type in, that turns our unique first-party data edge into the thing that actually keeps people from dropping off mid-filing.</div>
             </div>
           </li>
           <li class="tldr-reco-new">
