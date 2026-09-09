@@ -702,6 +702,18 @@ function buildAnalysisTab(){
               <div class="detail">FTU lets you remove the state return right on the payment screen; CK's equivalent control exists but only on a separate screen. Low effort &mdash; the control already exists, this is a placement fix.</div>
             </div>
           </li>
+          <li>
+            <div class="tldr-reco-num">4</div>
+            <div class="tldr-reco-body"><b>Add a "jump to the problem" affordance on "Needs review" summaries</b>
+              <div class="detail">When a W-2 or credit item is flagged "Needs review," link directly to the specific unresolved field/question instead of forcing a full re-walk of the entire multi-screen sequence. Medium effort (requires tracking which sub-field triggered the flag and deep-linking to it) &mdash; would have eliminated ~6&ndash;9 avoidable screens in this single traversal alone, and compounds across every filer who hits any "Needs review" state.</div>
+            </div>
+          </li>
+          <li>
+            <div class="tldr-reco-num">5</div>
+            <div class="tldr-reco-body"><b>Lean into CK's progress bar &mdash; FTU doesn't have one</b>
+              <div class="detail">This one's actually ours to protect, not steal: CK shows a live percentage progress bar (25%&rarr;50%&rarr;75%) plus a 5-stage map (My info &rarr; Federal &rarr; State &rarr; Final review &rarr; File) in the left rail throughout. FTU has a section rail but never surfaces a completion percentage anywhere in the traversal. Low effort, high value: make this MORE visible/prominent (it's easy to miss in the current rail), since a visible "you're 75% done" is a proven anti-abandonment cue exactly at the point filers are deciding whether to push through the tedious parts (like Income/W-2) or bail.</div>
+            </div>
+          </li>
         </ul>
       </div>
     </div>
