@@ -678,7 +678,6 @@ function buildAnalysisTab(){
       <div class="tldr-block tldr-summary">
         <h3>General summary</h3>
         <p>We ran the identical synthetic filer (single, Wyoming, one W-2, a $5,000 dependent-care benefit with no qualifying dependent) through both products end to end, from landing through the state-return paywall. Both land on the same numbers &mdash; $512 federal due, $0 CA state tax &mdash; but the paths there differ a lot: CK Tax is a CK-branded skin over TurboTax Online (confirmed via the SSO redirect and the "Smart Check" engine name surfacing in CA review), while FreeTaxUSA is a single-domain product that mirrors the literal 1040/Schedule structure throughout.</p>
-        <p>The single biggest finding: CK's Dependent Care Credit item gets stuck in a permanent "Needs review" loop that our own Federal Review never flags &mdash; a filer could complete and file with it silently unresolved. FreeTaxUSA handles the identical scenario correctly and explains it to the filer. That's the headline risk to fix, and FTU already proves the fix pattern on our own test data.</p>
       </div>
 
       <div class="tldr-block">
