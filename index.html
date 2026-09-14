@@ -751,33 +751,44 @@ function buildAnalysisTab(){
         <ul class="tldr-reco">
           <li class="tldr-reco-new">
             <div class="tldr-reco-num">1</div>
-            <div class="tldr-reco-body"><b>Steal from FTU: proactive e-file eligibility pre-check<span class="tag-new">New</span></b>
-              <div class="detail">FTU blocks e-file up front when the test EIN is invalid &mdash; the filer finds out immediately, with a clear next step (mail-in), rather than submitting and only finding out later. CK's traversal never surfaced an equivalent check anywhere in the flow.
-              <br><br>Why it matters for completion: a filer who gets a same-screen "here's the problem, here's the fix" doesn't lose momentum. A filer who finds out AFTER paying and clicking submit is the exact moment we risk losing them for good &mdash; or generating a support ticket instead of a filed return. This is a smaller, more surgical lift than a new feature: validate the eligibility-blocking fields (EIN format, SSN format, etc.) as soon as they're entered, not just at IRS transmission time.</div>
+            <div class="tldr-reco-body"><b>Test "Free" vs "$0" framing on the price itself<span class="tag-new">New</span></b>
+              <div class="detail">FTU's federal price reads as "Free"; CK's reads as "$0." Same number, different word &mdash; and FTU likely already has data on which converts better, given how central "free" is to their entire brand positioning. Worth an actual A/B experiment on our side rather than assuming either framing is obviously right.</div>
             </div>
           </li>
           <li class="tldr-reco-new">
             <div class="tldr-reco-num">2</div>
-            <div class="tldr-reco-body"><b>Monetization idea: "Do it with me" &mdash; live tax-expert help<span class="tag-new">New</span></b>
-              <div class="detail">Our persona profile (single, first W-2 kind of filer, unfamiliar terms like dependent-care add-backs) is exactly the segment most likely to want a human check-in, not just a cheaper price. Neither product currently sells this &mdash; FTU has no upsell path here at all, and CK's own upsell is a passive $29 audit/insurance bundle, not expert help. A "talk to a tax expert" add-on at the review step could both increase ARPU and directly patch the trust gap the stuck-loop bug creates.</div>
+            <div class="tldr-reco-body"><b>Name didn't auto-correct after W-2 upload (Test User vs. Stephen Stalcup)<span class="tag-new">New</span></b>
+              <div class="detail">On the mobile traversal, uploading a photo of the W-2 correctly OCR'd the employer, wages, and box-by-box detail (see CK Mobile tab) &mdash; but the placeholder persona name entered earlier in My Info ("Test User") never got reconciled against the name on the uploaded document ("Stephen Stalcup"). Given how much other W-2 data the OCR pipeline clearly captures, this feels like a gap rather than a hard limitation: a mismatch-detection prompt ("The name on this W-2 doesn't match your account &mdash; who's filing?") would catch a real, common data-entry error before it reaches the IRS.</div>
             </div>
           </li>
-          <li>
+          <li class="tldr-reco-new">
             <div class="tldr-reco-num">3</div>
-            <div class="tldr-reco-body"><b>Surface the buried cart-removal control at checkout</b>
-              <div class="detail">FTU lets you remove the state return right on the payment screen; CK's equivalent control exists but only on a separate screen. Low effort &mdash; the control already exists, this is a placement fix.</div>
+            <div class="tldr-reco-body"><b>Show more value in the PLUS upsell card at checkout<span class="tag-new">New</span></b>
+              <div class="detail">CK's PLUS card is a flat, three-bullet list with one price. FTU's equivalent (Deluxe in Phase 2 s05, Pro Support in Phase 4 s01 of the FTU tab) gives every single benefit its own icon, headline, and 1&ndash;2 sentence description &mdash; Priority Support with Live Chat, Unlimited Amended Returns, Save Your Tax Files, ProCheck Final Review, each one sold on its own. Even at a much higher price point ($64.99 vs CK's $29), FTU's version reads as more valuable because it's more legible. This is a content/design lift, not a repricing &mdash; describe what each PLUS benefit actually does the way FTU does.</div>
             </div>
           </li>
           <li>
             <div class="tldr-reco-num">4</div>
-            <div class="tldr-reco-body"><b>Add a "jump to the problem" affordance on "Needs review" summaries</b>
-              <div class="detail">When a W-2 or credit item is flagged "Needs review," link directly to the specific unresolved field/question instead of forcing a full re-walk of the entire multi-screen sequence. Medium effort (requires tracking which sub-field triggered the flag and deep-linking to it) &mdash; would have eliminated ~6&ndash;9 avoidable screens in this single traversal alone, and compounds across every filer who hits any "Needs review" state.</div>
+            <div class="tldr-reco-body"><b>Consider smaller/tiered monetization packages (S/M/L anchoring)</b>
+              <div class="detail">Right now CK effectively offers one add-on at one price. Multiple tiers give filers a relative anchor &mdash; the same psychology behind S/M/L pricing at fast food or Deluxe/Pro at FTU &mdash; which can lift attach rate on the middle option even if nobody buys the top tier. Caveat: this needs a light touch. FTU itself stays to two clear tiers (Deluxe, then Pro Support layered on top); the goal is 2&ndash;3 well-differentiated options, not a wall of 10 packages that overwhelms the filer at exactly the moment we want a fast, confident decision.</div>
             </div>
           </li>
           <li>
             <div class="tldr-reco-num">5</div>
-            <div class="tldr-reco-body"><b>Lean into CK's progress bar &mdash; FTU doesn't have one</b>
-              <div class="detail">This one's actually ours to protect, not steal: CK shows a live percentage progress bar (25%&rarr;50%&rarr;75%) plus a 5-stage map (My info &rarr; Federal &rarr; State &rarr; Final review &rarr; File) in the left rail throughout. FTU has a section rail but never surfaces a completion percentage anywhere in the traversal. Low effort, high value: make this MORE visible/prominent (it's easy to miss in the current rail), since a visible "you're 75% done" is a proven anti-abandonment cue exactly at the point filers are deciding whether to push through the tedious parts (like Income/W-2) or bail.</div>
+            <div class="tldr-reco-body"><b>Add a bookmark/save-your-place affordance</b>
+              <div class="detail">FTU shows a bookmark icon in the top-right corner of every screen throughout its flow. It's a small thing, but across a long multi-phase traversal like this it's an easy way to mark "come back to this" &mdash; and its absence on CK was noticeable: it was easy to lose track of where a given question or flagged item lived in CK's flow, especially with the CA worksheet-mode screens and repeated "Needs review" loops. Low effort, direct lift from a competitor feature that's already proven out.</div>
+            </div>
+          </li>
+          <li>
+            <div class="tldr-reco-num">6</div>
+            <div class="tldr-reco-body"><b>Experiment with top nav instead of left nav (CK-specific)</b>
+              <div class="detail">CK's left-rail navigation (My Info / Federal / State / Review / File, with nested Federal sub-items) takes up persistent horizontal space and, per the mobile traversal, collapses to a thin top progress bar on small screens anyway &mdash; suggesting the information architecture already works fine without a full vertical rail. Worth prototyping a top-nav layout (closer to FTU's horizontal Personal/Income/Deductions/Misc/Summary/State/Final Steps tab bar) to see whether it simplifies the desktop layout and unifies the desktop/mobile navigation model instead of maintaining two different patterns.</div>
+            </div>
+          </li>
+          <li>
+            <div class="tldr-reco-num">7</div>
+            <div class="tldr-reco-body"><b>Add a Federal&rarr;State transition screen that explains state-filing need</b>
+              <div class="detail">The mobile traversal's transition out of Federal went straight into "We got your state taxes started for you" with a $15/state price already attached, and separately, CK correctly detected that a Wyoming resident owes no state return but that logic wasn't explained to the filer in plain language first. A short interstitial &mdash; "Here's why you may (or may not) need to file a state return" &mdash; before the pricing/action moment would set expectations and reduce the "wait, why am I being charged for this" confusion, especially for filers who don't already know their state's income-tax status.</div>
             </div>
           </li>
         </ul>
